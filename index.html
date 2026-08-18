@@ -84,7 +84,7 @@
     <div class="linha">
       <label>Lojas (IDs separados por vírgula):
         <div class="input-grupo" style="margin-top: 5px;">
-          <input type="text" id="lojas" placeholder="Ex: 540,541 ou selecione no botão">
+          <input type="text" id="lojas" placeholder="Ex: 1,2 ou selecione no botão">
           <button type="button" class="btn-modal" onclick="abrirModalLojas()">Selecionar Lojas</button>
         </div>
       </label>
@@ -113,7 +113,7 @@
       <p id="cardTicketMedio">R$ 0,00</p>
     </div>
     <div class="card">
-      <h4>Total de Pedidos</h4>
+      <h4>Total de Itens Vendidos</h4>
       <p id="cardTotalPedidos">0</p>
     </div>
   </div>
@@ -264,12 +264,11 @@
       const body = {
         DATAINICIAL: formatarDataISOparaBR(document.getElementById("dataInicial").value),
         DATAFINAL: formatarDataISOparaBR(document.getElementById("dataFinal").value),
-        LOJAS: document.getElementById("lojas").value,
-        TIPOVENDA: ""
+        LOJAS: document.getElementById("lojas").value
       };
 
       try {
-        const response = await fetch("/consulta", {
+        const response = await fetch("/api/APIRelatoriosCR/ProdutosPorOSGrid", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body)
@@ -282,7 +281,7 @@
       } catch (error) {
         document.getElementById("resultado").innerHTML = "<p class='erro'>" + error.message + "</p>";
         atualizarKPIs(0, 0, 0);
-        atualizarGraficoPorLojas({});
+        atualizarGraficoPorProdutos({});
       } finally {
         document.getElementById("loadingOverlay").style.display = "none";
       }
@@ -292,57 +291,49 @@
       if (!data || data.length === 0) {
         document.getElementById("resultado").innerHTML = "<p class='erro'>Nenhum resultado encontrado para os filtros informados.</p>";
         atualizarKPIs(0, 0, 0);
-        atualizarGraficoPorLojas({});
+        atualizarGraficoPorProdutos({});
         return;
       }
-
-      const lojasDigitadasInput = document.getElementById("lojas").value.trim();
-      const idsFiltro = lojasDigitadasInput ? lojasDigitadasInput.split(",").map(s => s.trim()) : [];
 
       let totalLiquido = 0;
-      let totalPedidos = 0;
-      const vendasPorLoja = {};
+      let totalQuantidade = 0;
+      const vendasPorProduto = {};
 
-      data.forEach(venda => {
-        const codigoLojaVenda = String(venda.CODIGOLOJA || "").trim();
-
-        if (idsFiltro.length > 0 && !idsFiltro.includes(codigoLojaVenda)) {
-          return;
-        }
-
-        const nomeLoja = venda.NOMELOJA || "OUTRAS LOJAS";
-        const valorLiquidoNum = formatarMoedaBR(venda.VALORLIQUIDO);
+      data.forEach(item => {
+        const nomeProduto = item.PRODUTO || "OUTROS";
+        const valorLiquidoNum = formatarMoedaBR(item.LIQUIDOPRODUTO);
+        const qtdNum = Number(item.QUANTIDADE) || 0;
 
         totalLiquido += valorLiquidoNum;
-        totalPedidos++;
+        totalQuantidade += qtdNum;
 
-        vendasPorLoja[nomeLoja] = (vendasPorLoja[nomeLoja] || 0) + valorLiquidoNum;
+        vendasPorProduto[nomeProduto] = (vendasPorProduto[nomeProduto] || 0) + valorLiquidoNum;
       });
 
-      if (totalPedidos === 0) {
-        document.getElementById("resultado").innerHTML = "<p class='erro'>Nenhum registro correspondente após o filtro de lojas.</p>";
+      if (totalQuantidade === 0 && totalLiquido === 0) {
+        document.getElementById("resultado").innerHTML = "<p class='erro'>Nenhum registro correspondente após o processamento.</p>";
         atualizarKPIs(0, 0, 0);
-        atualizarGraficoPorLojas({});
+        atualizarGraficoPorProdutos({});
         return;
       }
 
-      const ticketMedio = totalPedidos > 0 ? totalLiquido / totalPedidos : 0;
+      const ticketMedio = totalQuantidade > 0 ? totalLiquido / totalQuantidade : 0;
 
-      atualizarKPIs(totalLiquido, ticketMedio, totalPedidos);
-      atualizarGraficoPorLojas(vendasPorLoja);
+      atualizarKPIs(totalLiquido, ticketMedio, totalQuantidade);
+      atualizarGraficoPorProdutos(vendasPorProduto);
     }
 
-    function atualizarKPIs(liquido, ticket, pedidos) {
+    function atualizarKPIs(liquido, ticket, quantidade) {
       document.getElementById("cardTotalLiquido").textContent = moedaParaTextoBR(liquido);
       document.getElementById("cardTicketMedio").textContent = moedaParaTextoBR(ticket);
-      document.getElementById("cardTotalPedidos").textContent = pedidos.toLocaleString('pt-BR');
+      document.getElementById("cardTotalPedidos").textContent = quantidade.toLocaleString('pt-BR');
     }
 
-    function atualizarGraficoPorLojas(vendasPorLoja) {
+    function atualizarGraficoPorProdutos(vendasPorProduto) {
       const ctx = document.getElementById('graficoVendasLoja').getContext('2d');
       
-      const labels = Object.keys(vendasPorLoja);
-      const valores = Object.values(vendasPorLoja);
+      const labels = Object.keys(vendasPorProduto);
+      const valores = Object.values(vendasPorProduto);
 
       if (meuGrafico) {
         meuGrafico.destroy();
@@ -353,7 +344,7 @@
         data: {
           labels: labels,
           datasets: [{
-            label: 'Total Líquido por Loja (R$)',
+            label: 'Total Líquido por Produto (R$)',
             data: valores,
             backgroundColor: '#0078d7',
             borderColor: '#005a9e',
@@ -368,7 +359,7 @@
             legend: { display: false },
             title: {
               display: true,
-              text: 'Desempenho de Vendas Líquidas por Loja',
+              text: 'Desempenho de Vendas Líquidas por Produto',
               font: { size: 16 }
             }
           },
