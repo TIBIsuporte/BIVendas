@@ -1,15 +1,21 @@
 // server.js
 const express = require("express");
 const cors = require("cors");
+const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
 app.use(express.json());
 app.use(cors());
 
-// NOVO: Adicione esta linha para servir a sua página index.html e arquivos da pasta
+// Servir a página index.html e arquivos estáticos da pasta
 app.use(express.static(__dirname));
 
-// rota que recebe os parâmetros e chama a API
+// Configuração do Supabase (use suas credenciais reais do projeto ossemcrm-db)
+const SUPABASE_URL = "https://cwmofpwuihrnifsvqhik.supabase.co";       // Ex: https://xxxx.supabase.co
+const SUPABASE_KEY = "sb_publishable_biWjIRo9x6maeZXcoKX6Lw_l-fjV0wP";  // Chave pública ou de serviço
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Rota que recebe os parâmetros, chama a nova API e salva no Supabase
 app.post("/consulta", async (req, res) => {
   const body = {
     DATAINICIAL: req.body.DATAINICIAL || "",
@@ -20,10 +26,11 @@ app.post("/consulta", async (req, res) => {
   };
 
   // LOG para verificar o body que está indo
-  console.log("Body enviado para API:", body);
+  console.log("Body enviado para API de Vendas Pendentes:", body);
 
   try {
-    const response = await fetch("https://api.savwinweb.com.br/api/APIRelatoriosCR/ProdutosPorOS", {
+    // URL alterada para o novo endpoint correto
+    const response = await fetch("https://api.savwinweb.com.br/api/APIDados/RetornaVendasPendentesCompletas", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -36,6 +43,18 @@ app.post("/consulta", async (req, res) => {
     console.log("Status da resposta da API:", response.status);
 
     const data = await response.json();
+
+    // Opcional: Se quiser salvar o log/resultado das vendas consultadas no Supabase
+    /*
+    const { error: supabaseError } = await supabase
+      .from('vendas_pendentes_log')
+      .insert([{ parametros: body, resposta_api: data, criado_em: new Date() }]);
+      
+    if (supabaseError) {
+      console.error("Erro ao salvar no Supabase:", supabaseError.message);
+    }
+    */
+
     res.json(data);
   } catch (err) {
     console.error("Erro ao chamar API:", err.message);
@@ -43,6 +62,6 @@ app.post("/consulta", async (req, res) => {
   }
 });
 
-// O Render precisa que o app utilize a porta dinâmica da nuvem (process.env.PORT)
+// Porta dinâmica para Render / Heroku / Local
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
