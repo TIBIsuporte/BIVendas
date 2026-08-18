@@ -113,7 +113,7 @@
       <p id="cardTicketMedio">R$ 0,00</p>
     </div>
     <div class="card">
-      <h4>Total de Itens Vendidos</h4>
+      <h4>Total de Ordens de Serviço (OS)</h4>
       <p id="cardTotalPedidos">0</p>
     </div>
   </div>
@@ -268,7 +268,7 @@
       };
 
       try {
-        const response = await fetch("/api/APIRelatoriosCR/ProdutosPorOSGrid", {
+        const response = await fetch("https://api.savwinweb.com.br/api/APIRelatoriosCR/ProdutosPorOSGrid", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body)
@@ -281,7 +281,7 @@
       } catch (error) {
         document.getElementById("resultado").innerHTML = "<p class='erro'>" + error.message + "</p>";
         atualizarKPIs(0, 0, 0);
-        atualizarGraficoPorProdutos({});
+        atualizarGraficoPorOS({});
       } finally {
         document.getElementById("loadingOverlay").style.display = "none";
       }
@@ -291,36 +291,64 @@
       if (!data || data.length === 0) {
         document.getElementById("resultado").innerHTML = "<p class='erro'>Nenhum resultado encontrado para os filtros informados.</p>";
         atualizarKPIs(0, 0, 0);
-        atualizarGraficoPorProdutos({});
+        atualizarGraficoPorOS({});
         return;
       }
 
-      let totalLiquido = 0;
-      let totalQuantidade = 0;
-      const vendasPorProduto = {};
+      // 1. Agrupar os itens por Ordem de Serviço (OS) para evitar duplicidade de valores de venda
+      const osMap = {};
 
       data.forEach(item => {
-        const nomeProduto = item.PRODUTO || "OUTROS";
-        const valorLiquidoNum = formatarMoedaBR(item.LIQUIDOPRODUTO);
-        const qtdNum = Number(item.QUANTIDADE) || 0;
+        // Identificador da OS (usando OS ou CODIGODAVENDA)
+        const numOS = item.OS || item.CODIGODAVENDA;
+        if (!numOS) return;
 
-        totalLiquido += valorLiquidoNum;
-        totalQuantidade += qtdNum;
+        if (!osMap[numOS]) {
+          osMap[numOS] = {
+            loja: item.LOJA || "",
+            data: item.DATA || "",
+            vlrLiquidoVenda: formatarMoedaBR(item.VLRLIQUIDOVENDA),
+            descontoVenda: formatarMoedaBR(item.DESCONTOVENDA),
+            itens: []
+          };
+        } else {
+          // Caso venham valores distribuídos ou preenchidos em linhas diferentes da mesma OS, pegamos o maior ou acumulamos se necessário
+          const vlrAtual = formatarMoedaBR(item.VLRLIQUIDOVENDA);
+          if (vlrAtual > osMap[numOS].vlrLiquidoVenda) {
+            osMap[numOS].vlrLiquidoVenda = vlrAtual;
+          }
+          const descAtual = formatarMoedaBR(item.DESCONTOVENDA);
+          if (descAtual > osMap[numOS].descontoVenda) {
+            osMap[numOS].descontoVenda = descAtual;
+          }
+        }
 
-        vendasPorProduto[nomeProduto] = (vendasPorProduto[nomeProduto] || 0) + valorLiquidoNum;
+        osMap[numOS].itens.push(item);
       });
 
-      if (totalQuantidade === 0 && totalLiquido === 0) {
+      let totalLiquidoGeral = 0;
+      let totalOSCount = 0;
+      const vendasPorOS = {};
+
+      // 2. Calcular os totais somando cada OS de forma única
+      Object.keys(osMap).forEach(numOS => {
+        const vendaOS = osMap[numOS];
+        totalLiquidoGeral += vendaOS.vlrLiquidoVenda;
+        totalOSCount++;
+        vendasPorOS[numOS] = vendaOS.vlrLiquidoVenda;
+      });
+
+      if (totalOSCount === 0 && totalLiquidoGeral === 0) {
         document.getElementById("resultado").innerHTML = "<p class='erro'>Nenhum registro correspondente após o processamento.</p>";
         atualizarKPIs(0, 0, 0);
-        atualizarGraficoPorProdutos({});
+        atualizarGraficoPorOS({});
         return;
       }
 
-      const ticketMedio = totalQuantidade > 0 ? totalLiquido / totalQuantidade : 0;
+      const ticketMedio = totalOSCount > 0 ? totalLiquidoGeral / totalOSCount : 0;
 
-      atualizarKPIs(totalLiquido, ticketMedio, totalQuantidade);
-      atualizarGraficoPorProdutos(vendasPorProduto);
+      atualizarKPIs(totalLiquidoGeral, ticketMedio, totalOSCount);
+      atualizarGraficoPorOS(vendasPorOS);
     }
 
     function atualizarKPIs(liquido, ticket, quantidade) {
@@ -329,11 +357,11 @@
       document.getElementById("cardTotalPedidos").textContent = quantidade.toLocaleString('pt-BR');
     }
 
-    function atualizarGraficoPorProdutos(vendasPorProduto) {
+    function atualizarGraficoPorOS(vendasPorOS) {
       const ctx = document.getElementById('graficoVendasLoja').getContext('2d');
       
-      const labels = Object.keys(vendasPorProduto);
-      const valores = Object.values(vendasPorProduto);
+      const labels = Object.keys(vendasPorOS).map(os => 'OS ' + os);
+      const valores = Object.values(vendasPorOS);
 
       if (meuGrafico) {
         meuGrafico.destroy();
@@ -344,7 +372,7 @@
         data: {
           labels: labels,
           datasets: [{
-            label: 'Total Líquido por Produto (R$)',
+            label: 'Valor Líquido da OS (R$)',
             data: valores,
             backgroundColor: '#0078d7',
             borderColor: '#005a9e',
@@ -359,7 +387,7 @@
             legend: { display: false },
             title: {
               display: true,
-              text: 'Desempenho de Vendas Líquidas por Produto',
+              text: 'Desempenho de Vendas Líquidas por Ordem de Serviço (OS)',
               font: { size: 16 }
             }
           },
