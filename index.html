@@ -2,43 +2,91 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Dashboard de Performance Comercial - BI Vendas</title>
+  <title>Dashboard de Performance Comercial - BI</title>
+  <!-- Importando as bibliotecas jsPDF e AutoTable via CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <!-- Importando Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Importando Chart.js para os gráficos -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     body { font-family: "Segoe UI", Arial, sans-serif; margin: 20px; background: #f4f6f9; }
     
-    .header-titulo { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 20px; border-bottom: 10px solid #0078d7; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .header-titulo {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 10px solid #0078d7;
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
     h2 { color: #0078d7; margin: 0; }
     .titulo-aga { font-style: italic; color: #333; font-size: 1.2em; font-weight: bold; }
 
-    .filtros { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
-    .linha { display: flex; gap: 20px; margin-top: 10px; }
-    .linha label { flex: 1; font-weight: bold; font-size: 14px; color: #333; }
-    input, select { padding: 9px; width: 100%; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; margin-top: 5px; }
-    button { padding: 10px 15px; background: #0078d7; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-    button:hover { background: #005a9e; }
-    .btn-acao { margin-top: 15px; width: 100%; font-size: 15px; }
-    .input-grupo { display: flex; gap: 10px; align-items: center; }
-    .btn-modal { background: #6c757d; white-space: nowrap; }
-
+    /* Cards de BI / Indicadores */
     .bi-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 20px; }
     .card { background: #fff; padding: 20px; border-radius: 8px; border-left: 5px solid #0078d7; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
     .card h4 { margin: 0; color: #666; font-size: 0.9em; text-transform: uppercase; }
     .card p { margin: 10px 0 0; font-size: 1.6em; font-weight: bold; color: #333; }
 
-    .chart-container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; height: 400px; }
+    /* Área do Gráfico */
+    .chart-container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; height: 350px; display: flex; justify-content: center; align-items: center; }
 
-    /* Estilo do Grid - ADICIONADO */
-    .grid-container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; overflow-x: auto; }
-    .grid-container table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
-    .grid-container th { background: #0078d7; color: #fff; padding: 10px; text-align: center; }
-    .grid-container td { padding: 8px; border-bottom: 1px solid #eee; text-align: center; }
-    .grid-container tr:hover { background: #f9f9f9; }
+    .filtros { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .linha { display: flex; gap: 20px; margin-top: 10px; }
+    .linha label { flex: 1; font-weight: bold; }
+    input, select { padding: 8px; width: 100%; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    button { padding: 10px 15px; background: #0078d7; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #005a9e; }
+    .btn-acao { margin-top: 10px; }
+    
+    .input-grupo { display: flex; gap: 10px; align-items: center; }
+    .btn-modal { background: #6c757d; white-space: nowrap; }
+    .btn-modal:hover { background: #5a6268; }
+
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+    .modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 500px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+    .modal-header { font-weight: bold; font-size: 16px; margin-bottom: 12px; color: #0078d7; display: flex; justify-content: space-between; align-items: center; }
+    
+    .modal-busca-container { margin-bottom: 10px; display: flex; flex-direction: column; gap: 5px; }
+    .modal-busca-container label { font-size: 12px; font-weight: bold; color: #555; }
+
+    .modal-body { overflow-y: auto; max-height: 45vh; border: 1px solid #eee; padding: 10px; border-radius: 4px; margin-bottom: 15px; }
+    .modal-body label { display: flex; justify-content: space-between; align-items: center; padding: 6px 4px; cursor: pointer; font-weight: normal; border-bottom: 1px solid #f9f9f9; font-size: 13px; }
+    .modal-body label:hover { background: #f1f1f1; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; }
+    .btn-secundario { background: #6c757d; }
+    .btn-secundario:hover { background: #5a6268; }
+
+    .table-container { overflow-x: auto; max-height: 60vh; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-top: 10px; }
+    table { border-collapse: collapse; width: 100%; }
+    th { background: #0078d7; color: #fff; padding: 10px; text-align: left; white-space: nowrap; position: sticky; top: 0; z-index: 10; }
+    td { padding: 9px 10px; border-bottom: 1px solid #eee; white-space: nowrap; }
+    tr:nth-child(even) { background: #f9f9f9; }
+    tr:hover { background: #eef6ff; }
+    .erro { color: red; font-weight: bold; margin-top: 15px; }
+    h3 { margin-top: 25px; color: #0078d7; }
+    .tabela-filtros th { background: #e2e8f0; padding: 6px 8px; top: 37px; }
+    .tabela-filtros select, .tabela-filtros input { font-size: 12px; padding: 4px; }
+    
+    .botoes-exportacao { margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn-excel { background: #28a745; }
+    .btn-excel:hover { background: #218838; }
+    .btn-pdf { background: #dc3545; }
+    .btn-pdf:hover { background: #c82333; }
+    .btn-pdf-lote { background: #6f42c1; }
+    .btn-pdf-lote:hover { background: #5a32a3; }
 
     .loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.8); z-index: 2000; justify-content: center; align-items: center; flex-direction: column; gap: 15px; }
     .spinner { width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid #0078d7; border-radius: 50%; animation: spin 1s linear infinite; }
+    .loading-text { font-weight: bold; color: #0078d7; font-size: 16px; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
@@ -49,82 +97,630 @@
     <span class="titulo-aga">by AGA</span>
   </div>
 
+  <!-- Cards de Indicadores (KPIs) -->
+  <div class="bi-cards">
+    <div class="card">
+      <h4>Total Vendas (Líquido)</h4>
+      <p id="cardTotalLiquido">R$ 0,00</p>
+    </div>
+    <div class="card">
+      <h4>Ticket Médio</h4>
+      <p id="cardTicketMedio">R$ 0,00</p>
+    </div>
+    <div class="card">
+      <h4>Total de Pedidos</h4>
+      <p id="cardTotalPedidos">0</p>
+    </div>
+  </div>
+
+  <!-- Container do Gráfico -->
+  <div class="chart-container">
+    <canvas id="graficoVendasLoja"></canvas>
+  </div>
+
   <div class="filtros">
     <div class="linha">
-      <label>Lojas (IDs separados por vírgula):
+      <label style="flex: 1;">Lojas (IDs separados por vírgula):
         <div class="input-grupo" style="margin-top: 5px;">
-          <input type="text" id="lojas" placeholder="Ex: 540,541">
+          <input type="text" id="lojas" placeholder="Ex: 540,541 ou selecione no botão">
           <button type="button" class="btn-modal" onclick="abrirModalLojas()">Selecionar Lojas</button>
         </div>
       </label>
     </div>
     <div class="linha">
-      <label>Data Inicial: <input type="date" id="dataInicial"></label>
-      <label>Data Final: <input type="date" id="dataFinal"></label>
+      <label>Data Inicial:
+        <input type="date" id="dataInicial">
+      </label>
+      <label>Data Final:
+        <input type="date" id="dataFinal">
+      </label>
     </div>
-    <button class="btn-acao" onclick="consultar()">Consultar Dashboard</button>
+    <div class="linha">
+      <label>Tipo de Data:
+        <select id="tipodata">
+          <option value="VENDA" selected>VENDA</option>
+          <option value="PAGAMENTO">PAGAMENTO</option>
+          <option value="ENTREGA">ENTREGA</option>
+        </select>
+      </label>
+    </div>
+    <button class="btn-acao" onclick="consultar()">Consultar</button>
   </div>
 
-  <div class="bi-cards">
-    <div class="card"><h4>Total Vendas (Líquido)</h4><p id="cardTotalLiquido">R$ 0,00</p></div>
-    <div class="card"><h4>Ticket Médio</h4><p id="cardTicketMedio">R$ 0,00</p></div>
-    <div class="card"><h4>Total de Pedidos</h4><p id="cardTotalPedidos">0</p></div>
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text">Gerando relatório BI, por favor aguarde...</div>
   </div>
 
-  <div class="chart-container">
-    <canvas id="graficoVendasLoja"></canvas>
-  </div>
+  <div id="resultado"></div>
 
-  <!-- GRID DE DETALHAMENTO ADICIONADO AO FINAL -->
-  <div class="grid-container">
-    <h3>Detalhamento das Vendas</h3>
-    <table>
-      <thead>
-        <tr>
-          <th>Loja</th><th>Cód. Venda</th><th>Tipo</th><th>V. Bruto</th><th>Desc %</th><th>Desc R$</th><th>Desc Caixa</th><th>V. Líquido</th>
-        </tr>
-      </thead>
-      <tbody id="corpoTabela"></tbody>
-    </table>
+  <!-- Modal Lojas -->
+  <div id="modalLojas" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span>Selecionar Lojas</span>
+      </div>
+      <div class="modal-busca-container">
+        <label>Filtrar por Código, Nome da Loja ou Gerente:</label>
+        <input type="text" id="inputFiltroGerenteModal" placeholder="Digite para filtrar..." onkeyup="filtrarLojasNoModal()">
+      </div>
+      <div style="margin-bottom: 8px;">
+        <label style="font-size: 13px; cursor: pointer; font-weight: bold; display: flex; justify-content: flex-start; gap: 8px;">
+          <input type="checkbox" id="selecionarTodasLojas" onclick="toggleSelecionarTodasLojas(this)" style="width: auto;"> Selecionar / Desmarcar Lojas Visíveis
+        </label>
+      </div>
+      <div class="modal-body" id="listaLojasModal"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secundario" onclick="fecharModalLojas()">Cancelar</button>
+        <button type="button" onclick="confirmarSelecaoLojas()">Confirmar</button>
+      </div>
+    </div>
   </div>
-
-  <div id="loadingOverlay" class="loading-overlay"><div class="spinner"></div></div>
 
   <script>
-    // [SUA LÓGICA ANTERIOR MANTIDA]
-    // ... (modal, variáveis, etc)
+    const SUPABASE_URL = 'https://cwmofpwuihrnifsvqhik.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_biWjIRo9x6maeZXcoKX6Lw_l-fjV0wP';
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    function processarEExibirBI(data) {
-      if (!data || data.length === 0) return;
+    let registrosGlobaisValidos = [];
+    let lojasDisponiveis = [];
+    let meuGrafico = null;
 
-      let totalLiquido = 0, totalPedidos = 0, vendasPorLoja = {};
-      let htmlRows = "";
+    window.onload = async () => {
+      try {
+        const { data, error } = await supabaseClient
+          .from('lojas')
+          .select('id, nome, gerente')
+          .order('id', { ascending: true });
+        
+        if (error) throw error;
+        lojasDisponiveis = data || [];
+      } catch (err) {
+        console.error("Erro ao carregar lojas do Supabase:", err.message);
+      }
+    };
 
-      data.forEach(venda => {
-        const vLiq = formatarMoedaBR(venda.VALORLIQUIDO);
-        totalLiquido += vLiq;
-        totalPedidos++;
-        vendasPorLoja[venda.NOMELOJA] = (vendasPorLoja[venda.NOMELOJA] || 0) + vLiq;
+    function obterGerentePorLoja(codigoLoja, nomeLoja) {
+      if (!codigoLoja && !nomeLoja) return "-";
+      const lojaEncontrada = lojasDisponiveis.find(l => 
+        String(l.id) === String(codigoLoja).trim() || 
+        (l.nome && l.nome.toUpperCase() === String(nomeLoja).trim().toUpperCase())
+      );
+      return lojaEncontrada ? (lojaEncontrada.gerente || "-") : "-";
+    }
 
-        // POPULANDO GRID
-        htmlRows += `<tr>
-          <td>${venda.CODIGOLOJA}</td>
-          <td>${venda.CODIGOVENDA}</td>
-          <td>${venda.TIPODEVENDA}</td>
-          <td>${moedaParaTextoBR(venda.VALORBRUTO)}</td>
-          <td>${Number(venda.DESCONTOPERCENTUAL).toFixed(2)}%</td>
-          <td>${moedaParaTextoBR(venda.DESCONTOVALOR)}</td>
-          <td>${moedaParaTextoBR(venda.DESCONTOCAIXA)}</td>
-          <td style="font-weight:bold; color:#0078d7;">${moedaParaTextoBR(venda.VALORLIQUIDO)}</td>
-        </tr>`;
+    function abrirModalLojas() {
+      document.getElementById("inputFiltroGerenteModal").value = "";
+      renderizarListaLojasModal(lojasDisponiveis);
+      document.getElementById("modalLojas").style.display = "flex";
+    }
+
+    function renderizarListaLojasModal(lista) {
+      const container = document.getElementById("listaLojasModal");
+      container.innerHTML = "";
+      const idsAtuais = document.getElementById("lojas").value.split(",").map(s => s.trim());
+      const listaOrdenada = [...lista].sort((a, b) => Number(a.id) - Number(b.id));
+
+      listaOrdenada.forEach(loja => {
+        const checked = idsAtuais.includes(String(loja.id)) ? "checked" : "";
+        container.innerHTML += `
+          <label class="item-loja-modal" data-texto="[${loja.id}] ${loja.nome} ${loja.gerente || ''}">
+            <div>
+              <input type="checkbox" value="${loja.id}" ${checked} style="width: auto; margin-right: 8px;"> 
+              <strong>[${loja.id}]</strong> ${loja.nome}
+            </div>
+            <span style="color: #666; font-size: 11px;">Gerente: ${loja.gerente || '-'}</span>
+          </label>
+        `;
+      });
+    }
+
+    function filtrarLojasNoModal() {
+      const termo = document.getElementById("inputFiltroGerenteModal").value.trim().toUpperCase();
+      const labels = document.querySelectorAll("#listaLojasModal .item-loja-modal");
+
+      labels.forEach(label => {
+        const texto = label.getAttribute("data-texto").toUpperCase();
+        if (texto.includes(termo) || termo === "") {
+          label.style.display = "flex";
+        } else {
+          label.style.display = "none";
+        }
+      });
+    }
+
+    function fecharModalLojas() {
+      document.getElementById("modalLojas").style.display = "none";
+    }
+
+    function toggleSelecionarTodasLojas(master) {
+      const labels = document.querySelectorAll("#listaLojasModal .item-loja-modal");
+      labels.forEach(label => {
+        if (label.style.display !== "none") {
+          const cb = label.querySelector("input[type='checkbox']");
+          if (cb) cb.checked = master.checked;
+        }
+      });
+    }
+
+    function confirmarSelecaoLojas() {
+      const idsSelecionados = [];
+      const checkboxes = document.querySelectorAll("#listaLojasModal input[type='checkbox']");
+      
+      checkboxes.forEach(cb => {
+        if (cb.checked) {
+          idsSelecionados.push(cb.value);
+        }
       });
 
-      document.getElementById("corpoTabela").innerHTML = htmlRows;
-      atualizarKPIs(totalLiquido, totalLiquido/totalPedidos, totalPedidos);
+      document.getElementById("lojas").value = idsSelecionados.join(",");
+      fecharModalLojas();
+    }
+
+    function formatarDataISOparaBR(dataISO) {
+      if (!dataISO) return "";
+      const partes = dataISO.split("-");
+      return `${partes[2]}/${partes[1]}/${partes[0]}`;
+    }
+
+    function formatarMoedaBR(valor) {
+      if (valor === "" || valor === null || valor === undefined) return 0;
+      const numero = Number(String(valor).replace(",", "."));
+      return isNaN(numero) ? 0 : numero;
+    }
+
+    function moedaParaTextoBR(valor) {
+      return Number(valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    async function consultar() {
+      document.getElementById("loadingOverlay").style.display = "flex";
+
+      const body = {
+        DATAINICIAL: formatarDataISOparaBR(document.getElementById("dataInicial").value),
+        DATAFINAL: formatarDataISOparaBR(document.getElementById("dataFinal").value),
+        LOJAS: document.getElementById("lojas").value,
+        TIPODATA: document.getElementById("tipodata").value || "VENDA",
+        TIPOVENDA: ""
+      };
+
+      try {
+        const response = await fetch("/consulta", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+
+        if (!response.ok) throw new Error("Erro na requisição: " + response.status);
+
+        const dadosBrutos = await response.json();
+        processarEExibir(dadosBrutos);
+      } catch (error) {
+        document.getElementById("resultado").innerHTML = "<p class='erro'>" + error.message + "</p>";
+      } finally {
+        document.getElementById("loadingOverlay").style.display = "none";
+      }
+    }
+
+    function processarEExibir(data) {
+      if (!data || data.length === 0) {
+        document.getElementById("resultado").innerHTML = "<p>Nenhum resultado encontrado.</p>";
+        atualizarKPIs(0, 0, 0);
+        atualizarGrafico([]);
+        return;
+      }
+
+      const lojasDigitadasInput = document.getElementById("lojas").value.trim();
+      const idsFiltro = lojasDigitadasInput ? lojasDigitadasInput.split(",").map(s => s.trim()) : [];
+
+      registrosGlobaisValidos = [];
+
+      data.forEach(venda => {
+        const codigoLojaVenda = String(venda.CODIGOLOJA || "").trim();
+
+        if (idsFiltro.length > 0 && !idsFiltro.includes(codigoLojaVenda)) {
+          return;
+        }
+
+        const nomeLoja = venda.NOMELOJA || "OUTRAS LOJAS";
+        const gerenteLoja = obterGerentePorLoja(codigoLojaVenda, nomeLoja);
+        const valorLiquidoNum = formatarMoedaBR(venda.VALORLIQUIDO);
+        
+        registrosGlobaisValidos.push({
+          GERENTE: gerenteLoja,
+          LOJANOME: nomeLoja,
+          CODIGOLOJA: codigoLojaVenda,
+          CODIGODAVENDA: venda.CODIGOVENDA || "",
+          DATAVENDA: venda.DATAVENDA || "",
+          PREVISAODEENTREGA: venda.PREVISAODEENTREGA || "",
+          TIPODEVENDA: venda.TIPODEVENDA || "",
+          NOMEVENDEDOR: venda.NOMEVENDEDOR || "",
+          VALORBRUTO: moedaParaTextoBR(formatarMoedaBR(venda.VALORBRUTO)),
+          DESCONTOVALOR: moedaParaTextoBR(formatarMoedaBR(venda.DESCONTOVALOR)),
+          DESCONTOCAIXA: moedaParaTextoBR(formatarMoedaBR(venda.DESCONTOCAIXA)),
+          VALORLIQUIDO_NUM: valorLiquidoNum,
+          VALORLIQUIDO: moedaParaTextoBR(valorLiquidoNum),
+          VALORJARECEBIDO: moedaParaTextoBR(formatarMoedaBR(venda.VALORJARECEBIDO)),
+          STATUSDAVENDA: venda.STATUSDAVENDA || "",
+          STATUSDAENTREGA: venda.STATUSDAENTREGA || ""
+        });
+      });
+
+      if (registrosGlobaisValidos.length === 0) {
+        document.getElementById("resultado").innerHTML = "<p>Nenhum registro encontrado para a(s) loja(s) informada(s).</p>";
+        atualizarKPIs(0, 0, 0);
+        atualizarGrafico([]);
+        return;
+      }
+
+      registrosGlobaisValidos.sort((a, b) => (a.LOJANOME || "").localeCompare(b.LOJANOME || ""));
+
+      // Calcular KPIs Totais
+      recalcularKPIsEOGrafico(registrosGlobaisValidos);
+
+      let html = "<h3>Detalhes Gerais por OS (Indexado por Loja)</h3>";
+      html += `<div class="botoes-exportacao">
+                 <button type="button" class="btn-excel" onclick="exportarExcel()">Exportar para Excel</button>
+                 <button type="button" class="btn-pdf" onclick="exportarPDF()">Exportar para PDF</button>
+                 <button type="button" class="btn-pdf-lote" onclick="exportarPDFsPorGerencia()">Exportar Lojas da Gerência (PDFs Individuais)</button>
+               </div>`;
+
+      html += '<div class="table-container"><table id="tabelaDetalhes"><thead>';
+      html += "<tr>" +
+        "<th>Gerente</th><th>Loja</th><th>Nº OS</th><th>Data Venda</th><th>Previsão Entrega</th><th>Tipo Venda</th>" +
+        "<th>Vendedor</th><th>Valor Bruto</th><th>Desc. Valor</th><th>Desc. Caixa</th><th>Valor Líq.</th><th>Valor Recebido</th><th>Pagamento</th><th>Status Entrega</th>" +
+        "</tr>";
+      
+      html += "<tr class='tabela-filtros'>" +
+        `<th><select id="filtroGerente" onchange="aoMudarGerente()"><option value="">Todos</option></select></th>` +
+        `<th><select id="filtroLoja" onchange="filtrarTabela()"><option value="">Todas</option></select></th>` +
+        `<th><input type="text" id="filtroOS" onkeyup="filtrarTabela()" placeholder="Filtrar..."></th>` +
+        `<th><input type="text" id="filtroDataVenda" onkeyup="filtrarTabela()" placeholder="Filtrar..."></th>` +
+        `<th><input type="text" id="filtroPrevisao" onkeyup="filtrarTabela()" placeholder="Filtrar..."></th>` +
+        `<th><select id="filtroTipoVenda" onchange="filtrarTabela()"><option value="">Todos</option></select></th>` +
+        `<th><select id="filtroVendedor" onchange="filtrarTabela()"><option value="">Todos</option></select></th>` +
+        `<th></th><th></th><th></th><th></th><th></th>` +
+        `<th><select id="filtroStatusVenda" onchange="filtrarTabela()"><option value="">Todos</option></select></th>` +
+        `<th><select id="filtroStatusEntrega" onchange="filtrarTabela()"><option value="">Todos</option></select></th>` +
+        "</tr>";
+
+      html += "</thead><tbody id='corpoTabelaDetalhes'>";
+
+      registrosGlobaisValidos.forEach(item => {
+        html += "<tr data-loja='" + (item.LOJANOME || "") + "' " +
+                "data-gerente='" + item.GERENTE + "' " +
+                "data-os='" + item.CODIGODAVENDA + "' " +
+                "data-datavenda='" + item.DATAVENDA + "' " +
+                "data-previsao='" + item.PREVISAODEENTREGA + "' " +
+                "data-tipovenda='" + item.TIPODEVENDA + "' " +
+                "data-vendedor='" + item.NOMEVENDEDOR + "' " +
+                "data-statusvenda='" + item.STATUSDAVENDA + "' " +
+                "data-statusentrega='" + item.STATUSDAENTREGA + "' " +
+                "data-valormanutencao='" + item.VALORLIQUIDO_NUM + "'>" +
+          `<td>${item.GERENTE}</td>` +
+          `<td>${item.LOJANOME}</td>` +
+          `<td>${item.CODIGODAVENDA}</td>` +
+          `<td>${item.DATAVENDA}</td>` +
+          `<td>${item.PREVISAODEENTREGA}</td>` +
+          `<td>${item.TIPODEVENDA}</td>` +
+          `<td>${item.NOMEVENDEDOR}</td>` +
+          `<td>${item.VALORBRUTO}</td>` +
+          `<td>${item.DESCONTOVALOR}</td>` +
+          `<td>${item.DESCONTOCAIXA}</td>` +
+          `<td>${item.VALORLIQUIDO}</td>` +
+          `<td>${item.VALORJARECEBIDO}</td>` +
+          `<td>${item.STATUSDAVENDA}</td>` +
+          `<td>${item.STATUSDAENTREGA}</td>` +
+          "</tr>";
+      });
+
+      html += "</tbody></table></div>";
+      document.getElementById("resultado").innerHTML = html;
+
+      popularFiltrosIniciais(registrosGlobaisValidos);
+    }
+
+    function popularFiltrosIniciais(registros) {
+      const gerentes = [...new Set(registros.map(i => i.GERENTE))].sort();
+      const tiposVenda = [...new Set(registros.map(i => i.TIPODEVENDA))].sort();
+      const vendedores = [...new Set(registros.map(i => i.NOMEVENDEDOR))].sort();
+      const statusVenda = [...new Set(registros.map(i => i.STATUSDAVENDA))].sort();
+      const statusEntrega = [...new Set(registros.map(i => i.STATUSDAENTREGA))].sort();
+
+      preencherSelect("filtroGerente", gerentes);
+      preencherSelect("filtroTipoVenda", tiposVenda);
+      preencherSelect("filtroVendedor", vendedores);
+      preencherSelect("filtroStatusVenda", statusVenda);
+      preencherSelect("filtroStatusEntrega", statusEntrega);
+
+      atualizarSelectLojasPorGerente(registros);
+    }
+
+    function atualizarSelectLojasPorGerente(registros) {
+      const fGerente = document.getElementById("filtroGerente").value.toLowerCase();
+      const registrosFiltrados = fGerente 
+        ? registros.filter(i => i.GERENTE.toLowerCase() === fGerente)
+        : registros;
+
+      const lojas = [...new Set(registrosFiltrados.map(i => i.LOJANOME))].sort();
+      const selectLoja = document.getElementById("filtroLoja");
+      const valorAtual = selectLoja.value;
+      
+      selectLoja.innerHTML = '<option value="">Todas</option>';
+      lojas.forEach(val => {
+        const opt = document.createElement("option");
+        opt.value = val;
+        opt.textContent = val;
+        selectLoja.appendChild(opt);
+      });
+
+      if (lojas.includes(valorAtual)) {
+        selectLoja.value = valorAtual;
+      } else {
+        selectLoja.value = "";
+      }
+    }
+
+    function aoMudarGerente() {
+      atualizarSelectLojasPorGerente(registrosGlobaisValidos);
+      filtrarTabela();
+    }
+
+    function preencherSelect(id, valores) {
+      const select = document.getElementById(id);
+      valores.forEach(val => {
+        const opt = document.createElement("option");
+        opt.value = val;
+        opt.textContent = val;
+        select.appendChild(opt);
+      });
+    }
+
+    function filtrarTabela() {
+      const fLoja = document.getElementById("filtroLoja").value.toLowerCase();
+      const fGerente = document.getElementById("filtroGerente").value.toLowerCase();
+      const fOS = document.getElementById("filtroOS").value.toLowerCase();
+      const fDataVenda = document.getElementById("filtroDataVenda").value.toLowerCase();
+      const fPrevisao = document.getElementById("filtroPrevisao").value.toLowerCase();
+      const fTipoVenda = document.getElementById("filtroTipoVenda").value.toLowerCase();
+      const fVendedor = document.getElementById("filtroVendedor").value.toLowerCase();
+      const fStatusVenda = document.getElementById("filtroStatusVenda").value.toLowerCase();
+      const fStatusEntrega = document.getElementById("filtroStatusEntrega").value.toLowerCase();
+
+      const linhas = document.getElementById("corpoTabelaDetalhes").getElementsByTagName("tr");
+
+      let somaLiquidoVisivel = 0;
+      let totalPedidosVisiveis = 0;
+      const vendasPorLojaVisivel = {};
+
+      for (let linha of linhas) {
+        const match = 
+          (!fLoja || linha.getAttribute("data-loja").toLowerCase().includes(fLoja)) &&
+          (!fGerente || linha.getAttribute("data-gerente").toLowerCase().includes(fGerente)) &&
+          (!fOS || linha.getAttribute("data-os").toLowerCase().includes(fOS)) &&
+          (!fDataVenda || linha.getAttribute("data-datavenda").toLowerCase().includes(fDataVenda)) &&
+          (!fPrevisao || linha.getAttribute("data-previsao").toLowerCase().includes(fPrevisao)) &&
+          (!fTipoVenda || linha.getAttribute("data-tipovenda").toLowerCase().includes(fTipoVenda)) &&
+          (!fVendedor || linha.getAttribute("data-vendedor").toLowerCase().includes(fVendedor)) &&
+          (!fStatusVenda || linha.getAttribute("data-statusvenda").toLowerCase().includes(fStatusVenda)) &&
+          (!fStatusEntrega || linha.getAttribute("data-statusentrega").toLowerCase().includes(fStatusEntrega));
+
+        linha.style.display = match ? "" : "none";
+
+        if (match) {
+          totalPedidosVisiveis++;
+          const valLiq = Number(linha.getAttribute("data-valormanutencao")) || 0;
+          somaLiquidoVisivel += valLiq;
+
+          const nomeLoja = linha.getAttribute("data-loja");
+          vendasPorLojaVisivel[nomeLoja] = (vendasPorLojaVisivel[nomeLoja] || 0) + valLiq;
+        }
+      }
+
+      // Atualiza os KPIs e o gráfico dinamicamente com base nos filtros da tabela
+      const ticketMedioVisivel = totalPedidosVisiveis > 0 ? somaLiquidoVisivel / totalPedidosVisiveis : 0;
+      atualizarKPIs(somaLiquidoVisivel, ticketMedioVisivel, totalPedidosVisiveis);
+      atualizarGraficoPorLojas(vendasPorLojaVisivel);
+    }
+
+    function atualizarKPIs(liquido, ticket, pedidos) {
+      document.getElementById("cardTotalLiquido").textContent = moedaParaTextoBR(liquido);
+      document.getElementById("cardTicketMedio").textContent = moedaParaTextoBR(ticket);
+      document.getElementById("cardTotalPedidos").textContent = pedidos.toLocaleString('pt-BR');
+    }
+
+    function recalcularKPIsEOGrafico(registros) {
+      let totalLiquido = 0;
+      const vendasPorLoja = {};
+
+      registros.forEach(item => {
+        const val = item.VALORLIQUIDO_NUM;
+        totalLiquido += val;
+        vendasPorLoja[item.LOJANOME] = (vendasPorLoja[item.LOJANOME] || 0) + val;
+      });
+
+      const totalPedidos = registros.length;
+      const ticketMedio = totalPedidos > 0 ? totalLiquido / totalPedidos : 0;
+
+      atualizarKPIs(totalLiquido, ticketMedio, totalPedidos);
       atualizarGraficoPorLojas(vendasPorLoja);
     }
 
-    // ... (restante das suas funções originais de suporte e Supabase)
+    function atualizarGraficoPorLojas(vendasPorLoja) {
+      const ctx = document.getElementById('graficoVendasLoja').getContext('2d');
+      
+      const labels = Object.keys(vendasPorLoja);
+      const valores = Object.values(vendasPorLoja);
+
+      if (meuGrafico) {
+        meuGrafico.destroy();
+      }
+
+      meuGrafico = new Chart(ctx, {
+        type: 'bar', // Pode mudar para 'pie' se preferir gráfico de pizza inicial
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Total Líquido por Loja (R$)',
+            data: valores,
+            backgroundColor: '#0078d7',
+            borderColor: '#005a9e',
+            borderWidth: 1,
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            title: {
+              display: true,
+              text: 'Desempenho de Vendas Líquidas por Loja',
+              font: { size: 16 }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function(value) {
+                  return 'R$ ' + value.toLocaleString('pt-BR');
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    const colunasExportacao = [
+      "Gerente", "Loja", "Nº OS", "Data Venda", "Previsão Entrega", "Tipo Venda",
+      "Vendedor", "Valor Bruto", "Desc. Valor", "Desc. Caixa", "Valor Líq.", "Valor Recebido", "Pagamento", "Status Entrega"
+    ];
+
+    function exportarExcel() {
+      const tabela = document.getElementById("tabelaDetalhes");
+      const linhas = Array.from(tabela.querySelectorAll("tbody tr")).filter(tr => tr.style.display !== "none");
+      
+      let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+      csvContent += colunasExportacao.join(";") + "\n";
+
+      linhas.forEach(tr => {
+        const celulas = Array.from(tr.querySelectorAll("td")).map(td => `"${td.innerText.replace(/"/g, '""')}"`);
+        csvContent += celulas.join(";") + "\n";
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "bi_vendas_detalhes.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function exportarPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF('l', 'mm', 'a4');
+      
+      doc.setFontSize(14);
+      doc.text("Dashboard de Performance Comercial - BI Vendas", 14, 15);
+
+      const linhasTabela = [];
+      const linhas = document.getElementById("corpoTabelaDetalhes").getElementsByTagName("tr");
+      
+      for (let linha of linhas) {
+        if (linha.style.display !== "none") {
+          const cols = linha.getElementsByTagName("td");
+          linhasTabela.push(Array.from(cols).map(c => c.innerText));
+        }
+      }
+
+      doc.autoTable({
+        head: [colunasExportacao],
+        body: linhasTabela,
+        startY: 22,
+        styles: { fontSize: 6 }
+      });
+
+      doc.save("bi_vendas_detalhes.pdf");
+    }
+
+    function exportarPDFsPorGerencia() {
+      const gerenteFiltro = document.getElementById("filtroGerente").value;
+      if (!gerenteFiltro) {
+        alert("Por favor, selecione uma Gerente no filtro da tabela antes de exportar os PDFs individuais por loja!");
+        return;
+      }
+
+      const linhas = document.getElementById("corpoTabelaDetalhes").getElementsByTagName("tr");
+      const lojasMap = {}; 
+
+      for (let linha of linhas) {
+        const lGerente = linha.getAttribute("data-gerente");
+        if (lGerente.toLowerCase() === gerenteFiltro.toLowerCase()) {
+          const lLoja = linha.getAttribute("data-loja");
+          if (!lojasMap[lLoja]) {
+            lojasMap[lLoja] = [];
+          }
+          const cols = linha.getElementsByTagName("td");
+          lojasMap[lLoja].push(Array.from(cols).map(c => c.innerText));
+        }
+      }
+
+      const nomesLojas = Object.keys(lojasMap);
+      if (nomesLojas.length === 0) {
+        alert("Nenhuma loja encontrada para a gerente selecionada.");
+      }
+
+      const { jsPDF } = window.jspdf;
+
+      nomesLojas.forEach((nomeLoja, index) => {
+        setTimeout(() => {
+          const doc = new jsPDF('l', 'mm', 'a4');
+          
+          doc.setFontSize(16);
+          doc.setTextColor(0, 120, 215);
+          doc.text("Dashboard de Performance Comercial - BI Vendas", 14, 15);
+          
+          doc.setFontSize(11);
+          doc.setTextColor(80, 80, 80);
+          doc.text(`Loja: ${nomeLoja} | Gerente: ${gerenteFiltro}`, 14, 23);
+          
+          doc.autoTable({
+            head: [colunasExportacao],
+            body: lojasMap[nomeLoja],
+            startY: 28,
+            styles: { fontSize: 6 }
+          });
+
+          const nomeArquivoPDF = `${nomeLoja} ${gerenteFiltro}.pdf`.toLowerCase();
+          doc.save(nomeArquivoPDF);
+
+        }, index * 400);
+      });
+    }
   </script>
 </body>
 </html>
