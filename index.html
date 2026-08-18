@@ -268,7 +268,8 @@
       };
 
       try {
-        const response = await fetch("https://api.savwinweb.com.br/api/APIRelatoriosCR/ProdutosPorOSGrid", {
+        // Chamada direcionada para a rota proxy no server.js (evita CORS)
+        const response = await fetch("/consulta", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body)
@@ -299,7 +300,6 @@
       const osMap = {};
 
       data.forEach(item => {
-        // Identificador da OS (usando OS ou CODIGODAVENDA)
         const numOS = item.OS || item.CODIGODAVENDA;
         if (!numOS) return;
 
@@ -312,7 +312,6 @@
             itens: []
           };
         } else {
-          // Caso venham valores distribuídos ou preenchidos em linhas diferentes da mesma OS, pegamos o maior ou acumulamos se necessário
           const vlrAtual = formatarMoedaBR(item.VLRLIQUIDOVENDA);
           if (vlrAtual > osMap[numOS].vlrLiquidoVenda) {
             osMap[numOS].vlrLiquidoVenda = vlrAtual;
