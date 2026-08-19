@@ -79,7 +79,6 @@
     <span class="titulo-aga">by AGA</span>
   </div>
 
-  <!-- 1. Filtros no Topo -->
   <div class="filtros">
     <div class="linha">
       <label>Lojas (IDs separados por vírgula):
@@ -102,7 +101,6 @@
 
   <div id="resultado"></div>
 
-  <!-- 2. Cards de Indicadores (KPIs) -->
   <div class="bi-cards">
     <div class="card">
       <h4>Total Vendas (Bruto)</h4>
@@ -122,7 +120,6 @@
     </div>
   </div>
 
-  <!-- 3. Container do Gráfico -->
   <div class="chart-container">
     <canvas id="graficoVendasLoja"></canvas>
   </div>
@@ -132,12 +129,9 @@
     <div class="loading-text">Processando indicadores de BI, por favor aguarde...</div>
   </div>
 
-  <!-- Modal Lojas -->
   <div id="modalLojas" class="modal-overlay">
     <div class="modal-content">
-      <div class="modal-header">
-        <span>Selecionar Lojas</span>
-      </div>
+      <div class="modal-header"><span>Selecionar Lojas</span></div>
       <div class="modal-busca-container">
         <label>Filtrar por Código, Nome da Loja ou Gerente:</label>
         <input type="text" id="inputFiltroGerenteModal" placeholder="Digite para filtrar..." onkeyup="filtrarLojasNoModal()">
@@ -169,7 +163,6 @@
           .from('lojas')
           .select('id, nome, gerente')
           .order('id', { ascending: true });
-        
         if (error) throw error;
         lojasDisponiveis = data || [];
       } catch (err) {
@@ -188,38 +181,26 @@
       container.innerHTML = "";
       const idsAtuais = document.getElementById("lojas").value.split(",").map(s => s.trim());
       const listaOrdenada = [...lista].sort((a, b) => Number(a.id) - Number(b.id));
-
       listaOrdenada.forEach(loja => {
         const checked = idsAtuais.includes(String(loja.id)) ? "checked" : "";
         container.innerHTML += `
           <label class="item-loja-modal" data-texto="[${loja.id}] ${loja.nome} ${loja.gerente || ''}">
-            <div>
-              <input type="checkbox" value="${loja.id}" ${checked} style="width: auto; margin-right: 8px;"> 
-              <strong>[${loja.id}]</strong> ${loja.nome}
-            </div>
+            <div><input type="checkbox" value="${loja.id}" ${checked} style="width: auto; margin-right: 8px;"> <strong>[${loja.id}]</strong> ${loja.nome}</div>
             <span style="color: #666; font-size: 11px;">Gerente: ${loja.gerente || '-'}</span>
-          </label>
-        `;
+          </label>`;
       });
     }
 
     function filtrarLojasNoModal() {
       const termo = document.getElementById("inputFiltroGerenteModal").value.trim().toUpperCase();
       const labels = document.querySelectorAll("#listaLojasModal .item-loja-modal");
-
       labels.forEach(label => {
         const texto = label.getAttribute("data-texto").toUpperCase();
-        if (texto.includes(termo) || termo === "") {
-          label.style.display = "flex";
-        } else {
-          label.style.display = "none";
-        }
+        label.style.display = (texto.includes(termo) || termo === "") ? "flex" : "none";
       });
     }
 
-    function fecharModalLojas() {
-      document.getElementById("modalLojas").style.display = "none";
-    }
+    function fecharModalLojas() { document.getElementById("modalLojas").style.display = "none"; }
 
     function toggleSelecionarTodasLojas(master) {
       const labels = document.querySelectorAll("#listaLojasModal .item-loja-modal");
@@ -233,14 +214,7 @@
 
     function confirmarSelecaoLojas() {
       const idsSelecionados = [];
-      const checkboxes = document.querySelectorAll("#listaLojasModal input[type='checkbox']");
-      
-      checkboxes.forEach(cb => {
-        if (cb.checked) {
-          idsSelecionados.push(cb.value);
-        }
-      });
-
+      document.querySelectorAll("#listaLojasModal input[type='checkbox']:checked").forEach(cb => idsSelecionados.push(cb.value));
       document.getElementById("lojas").value = idsSelecionados.join(",");
       fecharModalLojas();
     }
@@ -264,22 +238,18 @@
     async function consultar() {
       document.getElementById("loadingOverlay").style.display = "flex";
       document.getElementById("resultado").innerHTML = "";
-
       const body = {
         DATAINICIAL: formatarDataISOparaBR(document.getElementById("dataInicial").value),
         DATAFINAL: formatarDataISOparaBR(document.getElementById("dataFinal").value),
         LOJAS: document.getElementById("lojas").value
       };
-
       try {
         const response = await fetch("/consulta", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body)
         });
-
         if (!response.ok) throw new Error("Erro na requisição: " + response.status);
-
         const dadosBrutos = await response.json();
         processarEExibirBI(dadosBrutos);
       } catch (error) {
@@ -299,43 +269,23 @@
         return;
       }
 
-      // 1. Agrupar os itens por Ordem de Serviço (OS)
       const osMap = {};
-
       data.forEach(item => {
         const numOS = item.OS || item.CODIGODAVENDA;
         if (!numOS) return;
-
         const vlrBrutoProdutoItem = formatarMoedaBR(item.VALORBRUTOPRODUTO);
         const vlrLiquidoProdutoItem = formatarMoedaBR(item.LIQUIDOPRODUTO);
         const vlrLiquidoVendaHeader = formatarMoedaBR(item.VLRLIQUIDOVENDA);
         const tipoVenda = String(item.TIPOVENDA || "").trim().toUpperCase();
         const descontoVendaItem = formatarMoedaBR(item.DESCONTOVENDA);
 
-        // Valor Bruto padrão dos itens
-        let brutoEfetivoItem = vlrBrutoProdutoItem;
-
         if (!osMap[numOS]) {
-          osMap[numOS] = {
-            loja: item.LOJA || "",
-            data: item.DATA || "",
-            tipoVenda: tipoVenda,
-            vlrLiquidoVenda: vlrLiquidoVendaHeader,
-            descontoVenda: descontoVendaItem,
-            vlrBrutoTotalVenda: brutoEfetivoItem,
-            vlrLiquidoTotalItens: vlrLiquidoProdutoItem,
-            itens: []
-          };
+          osMap[numOS] = { tipoVenda, vlrLiquidoVenda: vlrLiquidoVendaHeader, descontoVenda: descontoVendaItem, vlrBrutoTotalVenda: vlrBrutoProdutoItem, vlrLiquidoTotalItens: vlrLiquidoProdutoItem };
         } else {
-          osMap[numOS].vlrBrutoTotalVenda += brutoEfetivoItem;
+          osMap[numOS].vlrBrutoTotalVenda += vlrBrutoProdutoItem;
           osMap[numOS].vlrLiquidoTotalItens += vlrLiquidoProdutoItem;
-          
-          if (descontoVendaItem > osMap[numOS].descontoVenda) {
-            osMap[numOS].descontoVenda = descontoVendaItem;
-          }
+          if (descontoVendaItem > osMap[numOS].descontoVenda) osMap[numOS].descontoVenda = descontoVendaItem;
         }
-
-        osMap[numOS].itens.push(item);
       });
 
       let totalLiquidoGeral = 0;
@@ -343,38 +293,23 @@
       let totalOSCount = 0;
       const vendasPorOS = {};
 
-      // 2. Calcular os totais somando cada OS de forma única e aplicando a regra de TROCA
       Object.keys(osMap).forEach(numOS => {
         const vendaOS = osMap[numOS];
+        let liquidoEfetivoOS = vendaOS.vlrLiquidoVenda || vendaOS.vlrLiquidoTotalItens;
         
-        let liquidoEfetivoOS = vendaOS.vlrLiquidoVenda;
-        if (liquidoEfetivoOS === 0 && vendaOS.vlrLiquidoTotalItens !== 0) {
-          liquidoEfetivoOS = vendaOS.vlrLiquidoTotalItens;
-        }
+        // --- FILTRO CIRÚRGICO: Ignorar OS com valor líquido menor ou igual a zero ---
+        if (liquidoEfetivoOS <= 0) return;
 
         let brutoEfetivoOS = vendaOS.vlrBrutoTotalVenda;
-
-        // REGRA: Se TIPOVENDA = "TROCA", subtrair o DESCONTOVENDA do Total Vendas (Bruto)
-        if (vendaOS.tipoVenda === "TROCA") {
-          brutoEfetivoOS -= vendaOS.descontoVenda;
-        }
+        if (vendaOS.tipoVenda === "TROCA") brutoEfetivoOS -= vendaOS.descontoVenda;
 
         totalLiquidoGeral += liquidoEfetivoOS;
         totalBrutoGeral += brutoEfetivoOS;
         totalOSCount++;
-        
         vendasPorOS[numOS] = liquidoEfetivoOS;
       });
 
-      if (totalOSCount === 0 && totalLiquidoGeral === 0) {
-        document.getElementById("resultado").innerHTML = "<p class='erro'>Nenhum registro correspondente após o processamento.</p>";
-        atualizarKPIs(0, 0, 0, 0);
-        atualizarGraficoPorOS({});
-        return;
-      }
-
       const ticketMedio = totalOSCount > 0 ? totalLiquidoGeral / totalOSCount : 0;
-
       atualizarKPIs(totalBrutoGeral, totalLiquidoGeral, ticketMedio, totalOSCount);
       atualizarGraficoPorOS(vendasPorOS);
     }
@@ -388,48 +323,17 @@
 
     function atualizarGraficoPorOS(vendasPorOS) {
       const ctx = document.getElementById('graficoVendasLoja').getContext('2d');
-      
-      const labels = Object.keys(vendasPorOS).map(os => 'OS ' + os);
-      const valores = Object.values(vendasPorOS);
-
-      if (meuGrafico) {
-        meuGrafico.destroy();
-      }
-
+      if (meuGrafico) meuGrafico.destroy();
       meuGrafico = new Chart(ctx, {
         type: 'bar',
         data: {
-          labels: labels,
-          datasets: [{
-            label: 'Valor Líquido da OS (R$)',
-            data: valores,
-            backgroundColor: '#0078d7',
-            borderColor: '#005a9e',
-            borderWidth: 1,
-            borderRadius: 4
-          }]
+          labels: Object.keys(vendasPorOS).map(os => 'OS ' + os),
+          datasets: [{ label: 'Valor Líquido da OS (R$)', data: Object.values(vendasPorOS), backgroundColor: '#0078d7', borderColor: '#005a9e', borderWidth: 1, borderRadius: 4 }]
         },
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            title: {
-              display: true,
-              text: 'Desempenho de Vendas Líquidas por Ordem de Serviço (OS)',
-              font: { size: 16 }
-            }
-          },
-          scales: {
-            y: {
-              beginAtZero: true,
-              ticks: {
-                callback: function(value) {
-                  return 'R$ ' + value.toLocaleString('pt-BR');
-                }
-              }
-            }
-          }
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, title: { display: true, text: 'Desempenho de Vendas Líquidas por Ordem de Serviço (OS)', font: { size: 16 } } },
+          scales: { y: { beginAtZero: true, ticks: { callback: value => 'R$ ' + value.toLocaleString('pt-BR') } } }
         }
       });
     }
