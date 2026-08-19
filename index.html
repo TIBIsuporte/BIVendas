@@ -40,11 +40,13 @@
     .btn-modal { background: #6c757d; white-space: nowrap; }
     .btn-modal:hover { background: #5a6268; }
 
-    /* Cards de BI / Indicadores (Atualizado para 5 colunas) */
-    .bi-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 15px; margin-bottom: 20px; }
+    /* Cards de BI / Indicadores (Atualizado para 6 colunas) */
+    .bi-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; margin-bottom: 20px; }
     .card { background: #fff; padding: 20px; border-radius: 8px; border-left: 5px solid #0078d7; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-    .card h4 { margin: 0; color: #666; font-size: 0.85em; text-transform: uppercase; }
-    .card p { margin: 10px 0 0; font-size: 1.4em; font-weight: bold; color: #333; }
+    .card h4 { margin: 0; color: #666; font-size: 0.8em; text-transform: uppercase; }
+    .card p { margin: 10px 0 0; font-size: 1.3em; font-weight: bold; color: #333; }
+    .card.devolucao { border-left-color: #dc3545; }
+    .card.devolucao p { color: #dc3545; }
 
     /* Área do Gráfico */
     .chart-container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; height: 450px; display: flex; justify-content: center; align-items: center; position: relative; }
@@ -109,6 +111,10 @@
     <div class="card">
       <h4>Total Vendas (Líquido)</h4>
       <p id="cardTotalLiquido">R$ 0,00</p>
+    </div>
+    <div class="card devolucao">
+      <h4>Total Devoluções</h4>
+      <p id="cardTotalDevolucoes">R$ 0,00</p>
     </div>
     <div class="card">
       <h4>Total Descontos</h4>
@@ -266,7 +272,7 @@
         processarEExibirBI(await response.json());
       } catch (error) {
         document.getElementById("resultado").innerHTML = "<p class='erro'>" + error.message + "</p>";
-        atualizarKPIs(0, 0, 0, 0, 0);
+        atualizarKPIs(0, 0, 0, 0, 0, 0);
         atualizarGraficoPizza({});
       } finally {
         document.getElementById("loadingOverlay").style.display = "none";
@@ -276,7 +282,7 @@
     function processarEExibirBI(data) {
       if (!data || data.length === 0) {
         document.getElementById("resultado").innerHTML = "<p class='erro'>Nenhum resultado encontrado.</p>";
-        atualizarKPIs(0, 0, 0, 0, 0);
+        atualizarKPIs(0, 0, 0, 0, 0, 0);
         atualizarGraficoPizza({});
         return;
       }
@@ -289,12 +295,11 @@
         
         if (!numOS) return;
 
-        // Captura e normaliza os valores dos campos
         const vlrLiquidoVenda = formatarMoedaBR(item.VLRLIQUIDOVENDA);
         const descontoVenda = formatarMoedaBR(item.DESCONTOVENDA);
         const vlrBrutoProduto = formatarMoedaBR(item.VALORBRUTOPRODUTO);
         const liquidoProduto = formatarMoedaBR(item.LIQUIDOPRODUTO);
-        const descontoProduto = Math.abs(formatarMoedaBR(item.DESCONTOVALORPRODUTO)); // Totaliza valor de desconto absoluto/positivo
+        const descontoProduto = Math.abs(formatarMoedaBR(item.DESCONTOVALORPRODUTO));
 
         if (!osMap[chaveUnica]) {
           osMap[chaveUnica] = {
@@ -317,12 +322,12 @@
         }
       });
 
-      let tLiq = 0, tBru = 0, tDesc = 0, tOS = 0;
+      let tLiq = 0, tBru = 0, tDev = 0, tDesc = 0, tOS = 0;
       const vendasPorLoja = {};
 
       Object.keys(osMap).forEach(chave => {
         const v = osMap[chave];
-        let liq = v.vlrLiquidoVenda > 0 ? v.vlrLiquidoVenda : v.vlrLiquidoTotalItens;
+        let liq = v.vlrLiquidoVenda !== 0 ? v.vlrLiquidoVenda : v.vlrLiquidoTotalItens;
         let bru = v.vlrBrutoTotalVenda;
         let desc = v.totalDescontosItens > 0 ? v.totalDescontosItens : v.descontoVenda;
 
@@ -330,10 +335,10 @@
         if (v.tipoVenda === "TROCA") {
           bru -= v.descontoVenda;
         } else if (v.tipoVenda === "DEVOLUCAO") {
-          // Devoluções reduzem o faturamento líquido e bruto
-          // Como os dados costumam vir negativos, garantimos a coerência do abatimento
-          if (liq > 0) liq = -Math.abs(liq);
-          if (bru > 0) bru = -Math.abs(bru);
+          // Garante que o líquido e bruto entrem negativos para abater o faturamento
+          liq = -Math.abs(liq !== 0 ? liq : v.vlrLiquidoTotalItens);
+          bru = -Math.abs(bru);
+          tDev += Math.abs(liq); // Acumula o valor absoluto para o card de devoluções
         }
 
         tLiq += liq;
@@ -341,11 +346,11 @@
         tDesc += Math.abs(desc);
         if (bru !== 0 || liq !== 0) tOS++;
 
-        // Buscar nome da loja se disponível na lista carregada
+        // Buscar nome da loja
         let nomeLojaStr = `Loja ${v.loja}`;
         const lojaEncontrada = lojasDisponiveis.find(l => String(l.id) === String(v.loja));
         if (lojaEncontrada) {
-          nomeLojaStr = `[${lojaEncontrada.id}] ${lojaEnnotFound = lojaEncontrada.nome}`;
+          nomeLojaStr = `[${lojaEncontrada.id}] ${lojaEncontrada.nome}`;
         }
 
         if (!vendasPorLoja[nomeLojaStr]) {
@@ -354,13 +359,14 @@
         vendasPorLoja[nomeLojaStr] += liq;
       });
 
-      atualizarKPIs(tBru, tLiq, tDesc, tOS > 0 ? tLiq / tOS : 0, tOS);
+      atualizarKPIs(tBru, tLiq, tDev, tDesc, tOS > 0 ? tLiq / tOS : 0, tOS);
       atualizarGraficoPizza(vendasPorLoja);
     }
 
-    function atualizarKPIs(bruto, liquido, desconto, ticket, qtd) {
+    function atualizarKPIs(bruto, liquido, devolucao, desconto, ticket, qtd) {
       document.getElementById("cardTotalBruto").textContent = moedaParaTextoBR(bruto);
       document.getElementById("cardTotalLiquido").textContent = moedaParaTextoBR(liquido);
+      document.getElementById("cardTotalDevolucoes").textContent = moedaParaTextoBR(devolucao);
       document.getElementById("cardTotalDesconto").textContent = moedaParaTextoBR(desconto);
       document.getElementById("cardTicketMedio").textContent = moedaParaTextoBR(ticket);
       document.getElementById("cardTotalPedidos").textContent = qtd.toLocaleString('pt-BR');
