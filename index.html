@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Seleção de Lojas - BI Vendas</title>
+  <title>Consulta de Lojas - BI Vendas</title>
   <!-- Importando Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -37,17 +37,15 @@
     .btn-modal { background: #6c757d; white-space: nowrap; }
     .btn-modal:hover { background: #5a6268; }
 
-    /* Painel do Resultado */
-    .painel-resultado {
-      background: #fff;
-      padding: 30px;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-      text-align: center;
-      font-size: 18px;
-      font-weight: bold;
-      color: #28a745;
-    }
+    /* Grid Principal de Dados */
+    .grid-container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .grid-container h3 { margin-top: 0; color: #0078d7; font-size: 1.1em; display: flex; justify-content: space-between; align-items: center; }
+    .table-wrapper { max-height: 65vh; overflow: auto; border: 1px solid #ddd; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+    th, td { padding: 8px 12px; border-bottom: 1px solid #eee; border-right: 1px solid #eee; white-space: nowrap; }
+    th { background: #0078d7; color: #fff; position: sticky; top: 0; z-index: 10; text-transform: uppercase; font-size: 12px; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+    tr:hover { background-color: #f1f1f1; }
 
     /* Modal Lojas */
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
@@ -63,6 +61,13 @@
     .modal-footer { display: flex; justify-content: flex-end; gap: 10px; }
     .btn-secundario { background: #6c757d; }
     .btn-secundario:hover { background: #5a6268; }
+
+    .erro { color: red; font-weight: bold; margin-top: 15px; text-align: center; }
+    
+    .loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.8); z-index: 2000; justify-content: center; align-items: center; flex-direction: column; gap: 15px; }
+    .spinner { width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid #0078d7; border-radius: 50%; animation: spin 1s linear infinite; }
+    .loading-text { font-weight: bold; color: #0078d7; font-size: 16px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -84,9 +89,29 @@
     <button class="btn-acao" onclick="consultar()">Consultar Dados</button>
   </div>
 
-  <!-- Área onde exibirá a mensagem -->
-  <div id="resultado" class="painel-resultado">
-    Aguardando consulta...
+  <div id="resultado"></div>
+
+  <!-- Grid com Renderização Dinâmica -->
+  <div class="grid-container">
+    <h3>
+      <span>Resultado da Consulta</span>
+      <span id="totalRegistros" style="font-size: 13px; color: #555;">0 registros encontrados</span>
+    </h3>
+    <div class="table-wrapper">
+      <table id="tabelaDados">
+        <thead id="cabecalhoTabela">
+          <tr><th>Aguardando Consulta</th></tr>
+        </thead>
+        <tbody id="corpoTabela">
+          <tr><td style="text-align: center; color: #777;">Selecione as lojas e clique em Consultar Dados.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text">Buscando dados na API, aguarde...</div>
   </div>
 
   <!-- Modal Lojas -->
@@ -186,8 +211,72 @@
       fecharModalLojas();
     }
 
-    function consultar() {
-      document.getElementById("resultado").innerHTML = "Tudo limpo.";
+    async function consultar() {
+      document.getElementById("loadingOverlay").style.display = "flex";
+      document.getElementById("resultado").innerHTML = "";
+
+      const body = {
+        LOJAS: document.getElementById("lojas").value
+      };
+
+      try {
+        const response = await fetch("/consulta", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+        
+        if (!response.ok) throw new Error("Erro na requisição HTTP: " + response.status);
+        
+        const dadosApi = await response.json();
+        renderizarGridPuro(dadosApi);
+      } catch (error) {
+        document.getElementById("resultado").innerHTML = "<p class='erro'>" + error.message + "</p>";
+      } finally {
+        document.getElementById("loadingOverlay").style.display = "none";
+      }
+    }
+
+    function renderizarGridPuro(dados) {
+      const thead = document.getElementById("cabecalhoTabela");
+      const tbody = document.getElementById("corpoTabela");
+      const labelTotal = document.getElementById("totalRegistros");
+
+      thead.innerHTML = "";
+      tbody.innerHTML = "";
+
+      if (!dados || dados.length === 0) {
+        labelTotal.textContent = "0 registros encontrados";
+        thead.innerHTML = "<tr><th>Mensagem</th></tr>";
+        tbody.innerHTML = "<tr><td style='text-align: center;'>Nenhum registro encontrado.</td></tr>";
+        return;
+      }
+
+      labelTotal.textContent = `${dados.length.toLocaleString('pt-BR')} registros encontrados`;
+
+      // 1. Extrai o nome de todas as chaves do primeiro registro para montar os cabeçalhos
+      const colunas = Object.keys(dados[0]);
+
+      // 2. Monta o Cabeçalho (TH) dinamicamente
+      let trHead = document.createElement("tr");
+      colunas.forEach(coluna => {
+        let th = document.createElement("th");
+        th.textContent = coluna;
+        trHead.appendChild(th);
+      });
+      thead.appendChild(trHead);
+
+      // 3. Preenche as Linhas (TR e TD) dinamicamente com os valores
+      dados.forEach(item => {
+        let tr = document.createElement("tr");
+        colunas.forEach(coluna => {
+          let td = document.createElement("td");
+          let valor = item[coluna];
+          td.textContent = (valor === null || valor === undefined) ? "-" : valor;
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
     }
   </script>
 </body>
