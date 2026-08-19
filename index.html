@@ -105,6 +105,10 @@
   <!-- 2. Cards de Indicadores (KPIs) -->
   <div class="bi-cards">
     <div class="card">
+      <h4>Total Vendas (Bruto)</h4>
+      <p id="cardTotalBruto">R$ 0,00</p>
+    </div>
+    <div class="card">
       <h4>Total Vendas (Líquido)</h4>
       <p id="cardTotalLiquido">R$ 0,00</p>
     </div>
@@ -268,7 +272,6 @@
       };
 
       try {
-        // Chamada direcionada para a rota proxy no server.js (evita CORS)
         const response = await fetch("/consulta", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -281,7 +284,7 @@
         processarEExibirBI(dadosBrutos);
       } catch (error) {
         document.getElementById("resultado").innerHTML = "<p class='erro'>" + error.message + "</p>";
-        atualizarKPIs(0, 0, 0);
+        atualizarKPIs(0, 0, 0, 0);
         atualizarGraficoPorOS({});
       } finally {
         document.getElementById("loadingOverlay").style.display = "none";
@@ -291,17 +294,19 @@
     function processarEExibirBI(data) {
       if (!data || data.length === 0) {
         document.getElementById("resultado").innerHTML = "<p class='erro'>Nenhum resultado encontrado para os filtros informados.</p>";
-        atualizarKPIs(0, 0, 0);
+        atualizarKPIs(0, 0, 0, 0);
         atualizarGraficoPorOS({});
         return;
       }
 
-      // 1. Agrupar os itens por Ordem de Serviço (OS) para evitar duplicidade de valores de venda
+      // 1. Agrupar os itens por Ordem de Serviço (OS)
       const osMap = {};
 
       data.forEach(item => {
         const numOS = item.OS || item.CODIGODAVENDA;
         if (!numOS) return;
+
+        const vlrBrutoProdutoItem = formatarMoedaBR(item.VALORBRUTOPRODUTO);
 
         if (!osMap[numOS]) {
           osMap[numOS] = {
@@ -309,6 +314,7 @@
             data: item.DATA || "",
             vlrLiquidoVenda: formatarMoedaBR(item.VLRLIQUIDOVENDA),
             descontoVenda: formatarMoedaBR(item.DESCONTOVENDA),
+            vlrBrutoTotalVenda: vlrBrutoProdutoItem,
             itens: []
           };
         } else {
@@ -320,12 +326,15 @@
           if (descAtual > osMap[numOS].descontoVenda) {
             osMap[numOS].descontoVenda = descAtual;
           }
+          // Soma o valor bruto do produto de cada item pertencente à mesma OS
+          osMap[numOS].vlrBrutoTotalVenda += vlrBrutoProdutoItem;
         }
 
         osMap[numOS].itens.push(item);
       });
 
       let totalLiquidoGeral = 0;
+      let totalBrutoGeral = 0;
       let totalOSCount = 0;
       const vendasPorOS = {};
 
@@ -333,24 +342,26 @@
       Object.keys(osMap).forEach(numOS => {
         const vendaOS = osMap[numOS];
         totalLiquidoGeral += vendaOS.vlrLiquidoVenda;
+        totalBrutoGeral += vendaOS.vlrBrutoTotalVenda;
         totalOSCount++;
         vendasPorOS[numOS] = vendaOS.vlrLiquidoVenda;
       });
 
       if (totalOSCount === 0 && totalLiquidoGeral === 0) {
         document.getElementById("resultado").innerHTML = "<p class='erro'>Nenhum registro correspondente após o processamento.</p>";
-        atualizarKPIs(0, 0, 0);
+        atualizarKPIs(0, 0, 0, 0);
         atualizarGraficoPorOS({});
         return;
       }
 
       const ticketMedio = totalOSCount > 0 ? totalLiquidoGeral / totalOSCount : 0;
 
-      atualizarKPIs(totalLiquidoGeral, ticketMedio, totalOSCount);
+      atualizarKPIs(totalBrutoGeral, totalLiquidoGeral, ticketMedio, totalOSCount);
       atualizarGraficoPorOS(vendasPorOS);
     }
 
-    function atualizarKPIs(liquido, ticket, quantidade) {
+    function atualizarKPIs(bruto, liquido, ticket, quantidade) {
+      document.getElementById("cardTotalBruto").textContent = moedaParaTextoBR(bruto);
       document.getElementById("cardTotalLiquido").textContent = moedaParaTextoBR(liquido);
       document.getElementById("cardTicketMedio").textContent = moedaParaTextoBR(ticket);
       document.getElementById("cardTotalPedidos").textContent = quantidade.toLocaleString('pt-BR');
