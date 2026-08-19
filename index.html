@@ -332,22 +332,25 @@
         let desc = v.totalDescontosItens > 0 ? v.totalDescontosItens : v.descontoVenda;
 
    
-        if (v.tipoVenda === "TROCA") {
-          bru -= v.descontoVenda;
-        } 
-        if (v.tipoVenda ==="DEVOLUCAO") {
-          // Como a devolução já vem negativa do banco, subtraímos o valor absoluto dela do total líquido e bruto
-          const valorDevolucao = Math.abs(liq !== 0 ? liq : v.vlrLiquidoTotalItens);
-          liq += valorDevolucao;
-          //bru += Math.abs(bru !== 0 ? bru : v.vlrBrutoTotalVenda);
-          tDev += valorDevolucao; // Acumula no card de devoluções
-        }
+      if (tipoVendaNorm === "TROCA") {
+        bru -= v.descontoVenda;
+      } 
+      
+      if (tipoVendaNorm === "DEVOLUCAO") {
+        // Como o banco já envia os valores negativos (ex: -317.25), 
+        // nós apenas garantimos o valor positivo para o card de Devoluções:
+        const valorDevolucaoCard = Math.abs(liq !== 0 ? liq : v.vlrLiquidoTotalItens);
+        tDev += valorDevolucaoCard; 
+        
+        // Os valores de 'liq' e 'bru' já entram naturalmente negativos 
+        // e vão abater o total geral de forma limpa e matemática por conta própria!
+      }
 
-        tLiq += liq;
-        tBru += bru;
-        tDesc += Math.abs(desc);
-        if (bru !== 0 || liq !== 0) tOS++;
-
+      tLiq += liq;
+      tBru += bru;
+      tDesc += Math.abs(desc);
+        
+      if (bru !== 0 || liq !== 0) tOS++;
         // Buscar nome da loja
         let nomeLojaStr = `Loja ${v.loja}`;
         const lojaEncontrada = lojasDisponiveis.find(l => String(l.id) === String(v.loja));
