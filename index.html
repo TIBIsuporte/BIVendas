@@ -299,16 +299,12 @@
         return;
       }
 
-      // 1. Agrupar os itens por Loja + Ordem de Serviço (Chave Composta) para evitar conflitos
+      // 1. Agrupar os itens por Ordem de Serviço (OS)
       const osMap = {};
 
       data.forEach(item => {
         const numOS = item.OS || item.CODIGODAVENDA;
-        const idLoja = item.LOJA || "GERAL";
         if (!numOS) return;
-
-        // Chave única combinando Loja e OS
-        const chaveUnica = `${idLoja}_${numOS}`;
 
         const vlrBrutoProdutoItem = formatarMoedaBR(item.VALORBRUTOPRODUTO);
         const vlrLiquidoProdutoItem = formatarMoedaBR(item.LIQUIDOPRODUTO);
@@ -316,12 +312,12 @@
         const tipoVenda = String(item.TIPOVENDA || "").trim().toUpperCase();
         const descontoVendaItem = formatarMoedaBR(item.DESCONTOVENDA);
 
+        // Valor Bruto padrão dos itens
         let brutoEfetivoItem = vlrBrutoProdutoItem;
 
-        if (!osMap[chaveUnica]) {
-          osMap[chaveUnica] = {
-            loja: idLoja,
-            osOriginal: numOS,
+        if (!osMap[numOS]) {
+          osMap[numOS] = {
+            loja: item.LOJA || "",
             data: item.DATA || "",
             tipoVenda: tipoVenda,
             vlrLiquidoVenda: vlrLiquidoVendaHeader,
@@ -331,15 +327,15 @@
             itens: []
           };
         } else {
-          osMap[chaveUnica].vlrBrutoTotalVenda += brutoEfetivoItem;
-          osMap[chaveUnica].vlrLiquidoTotalItens += vlrLiquidoProdutoItem;
+          osMap[numOS].vlrBrutoTotalVenda += brutoEfetivoItem;
+          osMap[numOS].vlrLiquidoTotalItens += vlrLiquidoProdutoItem;
           
-          if (descontoVendaItem > osMap[chaveUnica].descontoVenda) {
-            osMap[chaveUnica].descontoVenda = descontoVendaItem;
+          if (descontoVendaItem > osMap[numOS].descontoVenda) {
+            osMap[numOS].descontoVenda = descontoVendaItem;
           }
         }
 
-        osMap[chaveUnica].itens.push(item);
+        osMap[numOS].itens.push(item);
       });
 
       let totalLiquidoGeral = 0;
@@ -347,9 +343,9 @@
       let totalOSCount = 0;
       const vendasPorOS = {};
 
-      // 2. Calcular os totais somando cada OS de forma única e aplicando a regra de validação
-      Object.keys(osMap).forEach(chaveUnica => {
-        const vendaOS = osMap[chaveUnica];
+      // 2. Calcular os totais somando cada OS de forma única e aplicando a regra de TROCA
+      Object.keys(osMap).forEach(numOS => {
+        const vendaOS = osMap[numOS];
         
         let liquidoEfetivoOS = vendaOS.vlrLiquidoVenda;
         if (liquidoEfetivoOS === 0 && vendaOS.vlrLiquidoTotalItens !== 0) {
@@ -363,16 +359,12 @@
           brutoEfetivoOS -= vendaOS.descontoVenda;
         }
 
-        // Condição solicitada: Somar e incrementar contador apenas se o valor bruto for maior que zero
-        if (brutoEfetivoOS > 0) {
-          totalLiquidoGeral += liquidoEfetivoOS;
-          totalBrutoGeral += brutoEfetivoOS;
-          totalOSCount++;
-          
-          // Nome amigável para o gráfico exibindo Loja e OS
-          const rotuloGrafico = `Loja ${vendaOS.loja} - OS ${vendaOS.osOriginal}`;
-          vendasPorOS[rotuloGrafico] = liquidoEfetivoOS;
+        totalLiquidoGeral += liquidoEfetivoOS;
+        totalBrutoGeral += brutoEfetivoOS;
+	if (brutoEfetivoOS > 0) {
+        	totalOSCount++;
         }
+        vendasPorOS[numOS] = liquidoEfetivoOS;
       });
 
       if (totalOSCount === 0 && totalLiquidoGeral === 0) {
@@ -398,7 +390,7 @@
     function atualizarGraficoPorOS(vendasPorOS) {
       const ctx = document.getElementById('graficoVendasLoja').getContext('2d');
       
-      const labels = Object.keys(vendasPorOS);
+      const labels = Object.keys(vendasPorOS).map(os => 'OS ' + os);
       const valores = Object.values(vendasPorOS);
 
       if (meuGrafico) {
@@ -425,7 +417,7 @@
             legend: { display: false },
             title: {
               display: true,
-              text: 'Desempenho de Vendas Líquidas por Loja e Ordem de Serviço',
+              text: 'Desempenho de Vendas Líquidas por Ordem de Serviço (OS)',
               font: { size: 16 }
             }
           },
