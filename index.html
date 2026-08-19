@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Consulta de Dados - BI Vendas</title>
+  <title>Seleção de Lojas - BI Vendas</title>
   <!-- Importando Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -28,7 +28,7 @@
     .filtros { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
     .linha { display: flex; gap: 20px; margin-top: 10px; }
     .linha label { flex: 1; font-weight: bold; font-size: 14px; color: #333; }
-    input, select { padding: 9px; width: 100%; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; margin-top: 5px; }
+    input { padding: 9px; width: 100%; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; margin-top: 5px; }
     button { padding: 10px 15px; background: #0078d7; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
     button:hover { background: #005a9e; }
     .btn-acao { margin-top: 15px; width: 100%; font-size: 15px; }
@@ -37,20 +37,17 @@
     .btn-modal { background: #6c757d; white-space: nowrap; }
     .btn-modal:hover { background: #5a6268; }
 
-    /* Grid Principal de Dados */
-    .grid-container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-    .grid-container h3 { margin-top: 0; color: #0078d7; font-size: 1.1em; display: flex; justify-content: space-between; align-items: center; }
-    .table-wrapper { max-height: 65vh; overflow: auto; border: 1px solid #ddd; border-radius: 4px; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
-    th, td { padding: 8px 12px; border-bottom: 1px solid #eee; border-right: 1px solid #eee; white-space: nowrap; }
-    th { background: #0078d7; color: #fff; position: sticky; top: 0; z-index: 10; text-transform: uppercase; font-size: 12px; }
-    tr:nth-child(even) { background-color: #f9f9f9; }
-    tr:hover { background-color: #f1f1f1; }
-
-    /* Estilo do Rodapé / Totalizadores */
-    tfoot tr { background-color: #e9ecef; font-weight: bold; position: sticky; bottom: 0; z-index: 9; }
-    tfoot td { border-top: 2px solid #0078d7; color: #000; font-size: 13px; }
-    .text-right { text-align: right; }
+    /* Painel do Resultado */
+    .painel-resultado {
+      background: #fff;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      text-align: center;
+      font-size: 18px;
+      font-weight: bold;
+      color: #28a745;
+    }
 
     /* Modal Lojas */
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
@@ -66,19 +63,12 @@
     .modal-footer { display: flex; justify-content: flex-end; gap: 10px; }
     .btn-secundario { background: #6c757d; }
     .btn-secundario:hover { background: #5a6268; }
-
-    .erro { color: red; font-weight: bold; margin-top: 15px; text-align: center; }
-    
-    .loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.8); z-index: 2000; justify-content: center; align-items: center; flex-direction: column; gap: 15px; }
-    .spinner { width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid #0078d7; border-radius: 50%; animation: spin 1s linear infinite; }
-    .loading-text { font-weight: bold; color: #0078d7; font-size: 16px; }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
 
   <div class="header-titulo">
-    <h2>Consulta de Dados Brutos - BI Vendas</h2>
+    <h2>Consulta de Lojas - BI Vendas</h2>
     <span class="titulo-aga">by AGA</span>
   </div>
 
@@ -91,45 +81,12 @@
         </div>
       </label>
     </div>
-    <div class="linha">
-      <label>Data Inicial:
-        <input type="date" id="dataInicial">
-      </label>
-      <label>Data Final:
-        <input type="date" id="dataFinal">
-      </label>
-    </div>
     <button class="btn-acao" onclick="consultar()">Consultar Dados</button>
   </div>
 
-  <div id="resultado"></div>
-
-  <!-- Grid com Renderização Dinâmica e Rodapé de Totais -->
-  <div class="grid-container">
-    <h3>
-      <span>Resultado da Consulta</span>
-      <span id="totalRegistros" style="font-size: 13px; color: #555;">0 registros encontrados</span>
-    </h3>
-    <div class="table-wrapper">
-      <table id="tabelaDados">
-        <thead id="cabecalhoTabela">
-          <tr>
-            <th>Aguardando Consulta</th>
-          </tr>
-        </thead>
-        <tbody id="corpoTabela">
-          <tr>
-            <td style="text-align: center; color: #777;">Preencha os filtros acima e clique em Consultar Dados.</td>
-          </tr>
-        </tbody>
-        <tfoot id="rodapeTabela"></tfoot>
-      </table>
-    </div>
-  </div>
-
-  <div id="loadingOverlay" class="loading-overlay">
-    <div class="spinner"></div>
-    <div class="loading-text">Buscando dados na API, aguarde...</div>
+  <!-- Área onde exibirá a mensagem -->
+  <div id="resultado" class="painel-resultado">
+    Aguardando consulta...
   </div>
 
   <!-- Modal Lojas -->
@@ -229,141 +186,8 @@
       fecharModalLojas();
     }
 
-    function formatarDataISOparaBR(dataISO) {
-      if (!dataISO) return "";
-      const p = dataISO.split("-");
-      return `${p[2]}/${p[1]}/${p[0]}`;
-    }
-
-    // Auxiliar para converter texto/número em float numérico válido
-    function parseNumeroBR(valor) {
-      if (valor === null || valor === undefined || valor === "") return 0;
-      if (typeof valor === 'number') return valor;
-      const n = parseFloat(String(valor).replace(/\./g, '').replace(',', '.'));
-      return isNaN(n) ? 0 : n;
-    }
-
-    // Auxiliar para formatar números para moeda BR
-    function formatarMoeda(valor) {
-      return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    }
-
-    async function consultar() {
-      document.getElementById("loadingOverlay").style.display = "flex";
-      document.getElementById("resultado").innerHTML = "";
-
-      const body = {
-        DATAINICIAL: formatarDataISOparaBR(document.getElementById("dataInicial").value),
-        DATAFINAL: formatarDataISOparaBR(document.getElementById("dataFinal").value),
-        LOJAS: document.getElementById("lojas").value
-      };
-
-      try {
-        const response = await fetch("/consulta", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body)
-        });
-        
-        if (!response.ok) throw new Error("Erro na requisição HTTP: " + response.status);
-        
-        const dadosApi = await response.json();
-        renderizarGridPuro(dadosApi);
-      } catch (error) {
-        document.getElementById("resultado").innerHTML = "<p class='erro'>" + error.message + "</p>";
-        limparTabela();
-      } finally {
-        document.getElementById("loadingOverlay").style.display = "none";
-      }
-    }
-
-    function renderizarGridPuro(dados) {
-      const thead = document.getElementById("cabecalhoTabela");
-      const tbody = document.getElementById("corpoTabela");
-      const tfoot = document.getElementById("rodapeTabela");
-      const labelTotal = document.getElementById("totalRegistros");
-
-      thead.innerHTML = "";
-      tbody.innerHTML = "";
-      tfoot.innerHTML = "";
-
-      if (!dados || dados.length === 0) {
-        labelTotal.textContent = "0 registros encontrados";
-        thead.innerHTML = "<tr><th>Mensagem</th></tr>";
-        tbody.innerHTML = "<tr><td style='text-align: center;'>Nenhum registro encontrado para os filtros selecionados.</td></tr>";
-        return;
-      }
-
-      labelTotal.textContent = `${dados.length.toLocaleString('pt-BR')} registros encontrados`;
-
-      const colunas = Object.keys(dados[0]);
-
-      // Monta o Cabeçalho (TH)
-      let trHead = document.createElement("tr");
-      colunas.forEach(coluna => {
-        let th = document.createElement("th");
-        th.textContent = coluna;
-        trHead.appendChild(th);
-      });
-      thead.appendChild(trHead);
-
-      // Objeto para acumular totais de cada coluna
-      const totais = {};
-      const ehColunaNumerica = {};
-
-      colunas.forEach(col => {
-        totais[col] = 0;
-        ehColunaNumerica[col] = true; // Assume que é numérico até achar valor não numérico
-      });
-
-      // Monta as Linhas (TR) e calcula os totais
-      dados.forEach(item => {
-        let tr = document.createElement("tr");
-        colunas.forEach(coluna => {
-          let td = document.createElement("td");
-          let valorBruto = item[coluna];
-
-          // Trata valores nulos ou indefinições
-          let valorExibicao = (valorBruto === null || valorBruto === undefined) ? "-" : valorBruto;
-          td.textContent = valorExibicao;
-          tr.appendChild(td);
-
-          // Verifica se a coluna pode ser somada
-          if (valorBruto !== null && valorBruto !== undefined && valorBruto !== "") {
-            const num = parseNumeroBR(valorBruto);
-            if (!isNaN(num) && typeof valorBruto !== 'boolean') {
-              totais[coluna] += num;
-            } else {
-              ehColunaNumerica[coluna] = false;
-            }
-          }
-        });
-        tbody.appendChild(tr);
-      });
-
-      // Monta o Rodapé de Totais (TFOOT)
-      let trFoot = document.createElement("tr");
-      colunas.forEach((coluna, index) => {
-        let td = document.createElement("td");
-
-        if (index === 0) {
-          td.textContent = "TOTALIZADORES";
-        } else if (ehColunaNumerica[coluna]) {
-          td.textContent = formatarMoeda(totais[coluna]);
-          td.classList.add("text-right");
-        } else {
-          td.textContent = "-";
-        }
-        trFoot.appendChild(td);
-      });
-      tfoot.appendChild(trFoot);
-    }
-
-    function limparTabela() {
-      document.getElementById("totalRegistros").textContent = "0 registros encontrados";
-      document.getElementById("cabecalhoTabela").innerHTML = "<tr><th>Status</th></tr>";
-      document.getElementById("corpoTabela").innerHTML = "<tr><td style='text-align: center; color: red;'>Erro ao carregar dados.</td></tr>";
-      document.getElementById("rodapeTabela").innerHTML = "";
+    function consultar() {
+      document.getElementById("resultado").innerHTML = "Tudo limpo.";
     }
   </script>
 </body>
