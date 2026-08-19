@@ -51,6 +51,16 @@
     /* Área do Gráfico */
     .chart-container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; height: 450px; display: flex; justify-content: center; align-items: center; position: relative; }
 
+    /* Grid de Auditoria */
+    .grid-container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .grid-container h3 { margin-top: 0; color: #0078d7; font-size: 1.1em; }
+    .table-wrapper { max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+    th, td { padding: 8px 12px; border-bottom: 1px solid #eee; }
+    th { background: #0078d7; color: #fff; position: sticky; top: 0; z-index: 10; }
+    tr:hover { background: #f1f1f1; }
+    .text-right { text-align: right; }
+
     /* Modal Lojas */
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
     .modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 500px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
@@ -132,6 +142,31 @@
 
   <div class="chart-container">
     <canvas id="graficoVendasLoja"></canvas>
+  </div>
+
+  <!-- Grid de Auditoria de OS -->
+  <div class="grid-container">
+    <h3>Grid de Auditoria / Conferência de OS Consolidada</h3>
+    <div class="table-wrapper">
+      <table id="tabelaAuditoria">
+        <thead>
+          <tr>
+            <th>Loja</th>
+            <th>Nº OS / Venda</th>
+            <th>Tipo Venda</th>
+            <th class="text-right">Bruto (Calculado)</th>
+            <th class="text-right">Líquido (Calculado)</th>
+            <th class="text-right">Devolução</th>
+            <th class="text-right">Desconto</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td colspan="7" style="text-align: center; color: #777;">Nenhuma consulta realizada ainda.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <div id="loadingOverlay" class="loading-overlay">
@@ -274,6 +309,7 @@
         document.getElementById("resultado").innerHTML = "<p class='erro'>" + error.message + "</p>";
         atualizarKPIs(0, 0, 0, 0, 0, 0);
         atualizarGraficoPizza({});
+        renderizarGridAuditoria([]);
       } finally {
         document.getElementById("loadingOverlay").style.display = "none";
       }
@@ -284,6 +320,7 @@
         document.getElementById("resultado").innerHTML = "<p class='erro'>Nenhum resultado encontrado.</p>";
         atualizarKPIs(0, 0, 0, 0, 0, 0);
         atualizarGraficoPizza({});
+        renderizarGridAuditoria([]);
         return;
       }
 
@@ -324,6 +361,7 @@
 
       let tLiq = 0, tBru = 0, tDev = 0, tDesc = 0, tOS = 0;
       const vendasPorLoja = {};
+      const listaAuditoria = [];
 
       Object.keys(osMap).forEach(chave => {
         const v = osMap[chave];
@@ -331,16 +369,16 @@
         let bru = v.vlrBrutoTotalVenda;
         let desc = v.totalDescontosItens > 0 ? v.totalDescontosItens : v.descontoVenda;
 
-        // CRIANDO A VARIÁVEL CORRETAMENTE PARA EVITAR O ERRO
         const tipoVendaNorm = v.tipoVenda;
+        let valorDevolucaoLinha = 0;
 
         if (tipoVendaNorm === "TROCA") {
           bru -= v.descontoVenda;
         } 
         
         if (tipoVendaNorm === "DEVOLUCAO") {
-          const valorDevolucaoCard = Math.abs(liq !== 0 ? liq : v.vlrLiquidoTotalItens);
-          tDev += valorDevolucaoCard; 
+          valorDevolucaoLinha = Math.abs(liq !== 0 ? liq : v.vlrLiquidoTotalItens);
+          tDev += valorDevolucaoLinha; 
         }
 
         tLiq += liq;
@@ -360,10 +398,22 @@
           vendasPorLoja[nomeLojaStr] = 0;
         }
         vendasPorLoja[nomeLojaStr] += liq;
+
+        // Guardar para o grid de auditoria
+        listaAuditoria.push({
+          loja: nomeLojaStr,
+          numOS: v.numOS,
+          tipoVenda: tipoVendaNorm || "NÃO INFORMADO",
+          bruto: bru,
+          liquido: liq,
+          devolucao: valorDevolucaoLinha,
+          desconto: Math.abs(desc)
+        });
       });
 
       atualizarKPIs(tBru, tLiq, tDev, tDesc, tOS > 0 ? tLiq / tOS : 0, tOS);
       atualizarGraficoPizza(vendasPorLoja);
+      renderizarGridAuditoria(listaAuditoria);
     }
 
     function atualizarKPIs(bruto, liquido, devolucao, desconto, ticket, qtd) {
@@ -373,6 +423,30 @@
       document.getElementById("cardTotalDesconto").textContent = moedaParaTextoBR(desconto);
       document.getElementById("cardTicketMedio").textContent = moedaParaTextoBR(ticket);
       document.getElementById("cardTotalPedidos").textContent = qtd.toLocaleString('pt-BR');
+    }
+
+    function renderizarGridAuditoria(lista) {
+      const tbody = document.querySelector("#tabelaAuditoria tbody");
+      tbody.innerHTML = "";
+
+      if (!lista || lista.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #777;">Nenhum registro para exibir.</td></tr>`;
+        return;
+      }
+
+      lista.forEach(item => {
+        tbody.innerHTML += `
+          <tr>
+            <td>${item.loja}</td>
+            <td><strong>${item.numOS}</strong></td>
+            <td><span style="padding: 2px 6px; background: #e9ecef; border-radius: 4px; font-size: 11px;">${item.tipoVenda}</span></td>
+            <td class="text-right">${moedaParaTextoBR(item.bruto)}</td>
+            <td class="text-right">${moedaParaTextoBR(item.liquido)}</td>
+            <td class="text-right" style="color: ${item.devolucao > 0 ? '#dc3545' : 'inherit'}; font-weight: ${item.devolucao > 0 ? 'bold' : 'normal'};">${moedaParaTextoBR(item.devolucao)}</td>
+            <td class="text-right">${moedaParaTextoBR(item.desconto)}</td>
+          </tr>
+        `;
+      });
     }
 
     function atualizarGraficoPizza(vendasPorLoja) {
