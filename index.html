@@ -361,8 +361,9 @@
 
         totalLiquidoGeral += liquidoEfetivoOS;
         totalBrutoGeral += brutoEfetivoOS;
-        totalOSCount++;
-        
+	if (brutoEfetivoOS > 0) {
+        	totalOSCount++;
+        }
         vendasPorOS[numOS] = liquidoEfetivoOS;
       });
 
