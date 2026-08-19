@@ -84,7 +84,7 @@
     <div class="linha">
       <label>Lojas (IDs separados por vírgula):
         <div class="input-grupo" style="margin-top: 5px;">
-          <input type="text" id="lojas" placeholder="Ex: 540,541 ou selecione no botão">
+          <input type="text" id="lojas" placeholder="Ex: 1,2 ou selecione no botão">
           <button type="button" class="btn-modal" onclick="abrirModalLojas()">Selecionar Lojas</button>
         </div>
       </label>
@@ -97,15 +97,6 @@
         <input type="date" id="dataFinal">
       </label>
     </div>
-    <div class="linha">
-      <label>Tipo de Data:
-        <select id="tipodata">
-          <option value="VENDA" selected>VENDA</option>
-          <option value="PAGAMENTO">PAGAMENTO</option>
-          <option value="ENTREGA">ENTREGA</option>
-        </select>
-      </label>
-    </div>
     <button class="btn-acao" onclick="consultar()">Consultar Dashboard</button>
   </div>
 
@@ -113,6 +104,10 @@
 
   <!-- 2. Cards de Indicadores (KPIs) -->
   <div class="bi-cards">
+    <div class="card">
+      <h4>Total Vendas (Bruto)</h4>
+      <p id="cardTotalBruto">R$ 0,00</p>
+    </div>
     <div class="card">
       <h4>Total Vendas (Líquido)</h4>
       <p id="cardTotalLiquido">R$ 0,00</p>
@@ -122,7 +117,7 @@
       <p id="cardTicketMedio">R$ 0,00</p>
     </div>
     <div class="card">
-      <h4>Total de Pedidos</h4>
+      <h4>Total de Ordens de Serviço (OS)</h4>
       <p id="cardTotalPedidos">0</p>
     </div>
   </div>
@@ -273,9 +268,7 @@
       const body = {
         DATAINICIAL: formatarDataISOparaBR(document.getElementById("dataInicial").value),
         DATAFINAL: formatarDataISOparaBR(document.getElementById("dataFinal").value),
-        LOJAS: document.getElementById("lojas").value,
-        TIPODATA: document.getElementById("tipodata").value || "VENDA",
-        TIPOVENDA: ""
+        LOJAS: document.getElementById("lojas").value
       };
 
       try {
@@ -291,8 +284,8 @@
         processarEExibirBI(dadosBrutos);
       } catch (error) {
         document.getElementById("resultado").innerHTML = "<p class='erro'>" + error.message + "</p>";
-        atualizarKPIs(0, 0, 0);
-        atualizarGraficoPorLojas({});
+        atualizarKPIs(0, 0, 0, 0);
+        atualizarGraficoPorOS({});
       } finally {
         document.getElementById("loadingOverlay").style.display = "none";
       }
@@ -301,58 +294,112 @@
     function processarEExibirBI(data) {
       if (!data || data.length === 0) {
         document.getElementById("resultado").innerHTML = "<p class='erro'>Nenhum resultado encontrado para os filtros informados.</p>";
-        atualizarKPIs(0, 0, 0);
-        atualizarGraficoPorLojas({});
+        atualizarKPIs(0, 0, 0, 0);
+        atualizarGraficoPorOS({});
         return;
       }
 
-      const lojasDigitadasInput = document.getElementById("lojas").value.trim();
-      const idsFiltro = lojasDigitadasInput ? lojasDigitadasInput.split(",").map(s => s.trim()) : [];
+      // 1. Agrupar os itens por Loja + Ordem de Serviço (Chave Composta) para evitar conflitos
+      const osMap = {};
 
-      let totalLiquido = 0;
-      let totalPedidos = 0;
-      const vendasPorLoja = {};
+      data.forEach(item => {
+        const numOS = item.OS || item.CODIGODAVENDA;
+        const idLoja = item.LOJA || "GERAL";
+        if (!numOS) return;
 
-      data.forEach(venda => {
-        const codigoLojaVenda = String(venda.CODIGOLOJA || "").trim();
+        // Chave única combinando Loja e OS
+        const chaveUnica = `${idLoja}_${numOS}`;
 
-        if (idsFiltro.length > 0 && !idsFiltro.includes(codigoLojaVenda)) {
-          return;
+        const vlrBrutoProdutoItem = formatarMoedaBR(item.VALORBRUTOPRODUTO);
+        const vlrLiquidoProdutoItem = formatarMoedaBR(item.LIQUIDOPRODUTO);
+        const vlrLiquidoVendaHeader = formatarMoedaBR(item.VLRLIQUIDOVENDA);
+        const tipoVenda = String(item.TIPOVENDA || "").trim().toUpperCase();
+        const descontoVendaItem = formatarMoedaBR(item.DESCONTOVENDA);
+
+        let brutoEfetivoItem = vlrBrutoProdutoItem;
+
+        if (!osMap[chaveUnica]) {
+          osMap[chaveUnica] = {
+            loja: idLoja,
+            osOriginal: numOS,
+            data: item.DATA || "",
+            tipoVenda: tipoVenda,
+            vlrLiquidoVenda: vlrLiquidoVendaHeader,
+            descontoVenda: descontoVendaItem,
+            vlrBrutoTotalVenda: brutoEfetivoItem,
+            vlrLiquidoTotalItens: vlrLiquidoProdutoItem,
+            itens: []
+          };
+        } else {
+          osMap[chaveUnica].vlrBrutoTotalVenda += brutoEfetivoItem;
+          osMap[chaveUnica].vlrLiquidoTotalItens += vlrLiquidoProdutoItem;
+          
+          if (descontoVendaItem > osMap[chaveUnica].descontoVenda) {
+            osMap[chaveUnica].descontoVenda = descontoVendaItem;
+          }
         }
 
-        const nomeLoja = venda.NOMELOJA || "OUTRAS LOJAS";
-        const valorLiquidoNum = formatarMoedaBR(venda.VALORLIQUIDO);
-
-        totalLiquido += valorLiquidoNum;
-        totalPedidos++;
-
-        vendasPorLoja[nomeLoja] = (vendasPorLoja[nomeLoja] || 0) + valorLiquidoNum;
+        osMap[chaveUnica].itens.push(item);
       });
 
-      if (totalPedidos === 0) {
-        document.getElementById("resultado").innerHTML = "<p class='erro'>Nenhum registro correspondente após o filtro de lojas.</p>";
-        atualizarKPIs(0, 0, 0);
-        atualizarGraficoPorLojas({});
+      let totalLiquidoGeral = 0;
+      let totalBrutoGeral = 0;
+      let totalOSCount = 0;
+      const vendasPorOS = {};
+
+      // 2. Calcular os totais somando cada OS de forma única e aplicando a regra de validação
+      Object.keys(osMap).forEach(chaveUnica => {
+        const vendaOS = osMap[chaveUnica];
+        
+        let liquidoEfetivoOS = vendaOS.vlrLiquidoVenda;
+        if (liquidoEfetivoOS === 0 && vendaOS.vlrLiquidoTotalItens !== 0) {
+          liquidoEfetivoOS = vendaOS.vlrLiquidoTotalItens;
+        }
+
+        let brutoEfetivoOS = vendaOS.vlrBrutoTotalVenda;
+
+        // REGRA: Se TIPOVENDA = "TROCA", subtrair o DESCONTOVENDA do Total Vendas (Bruto)
+        if (vendaOS.tipoVenda === "TROCA") {
+          brutoEfetivoOS -= vendaOS.descontoVenda;
+        }
+
+        // Condição solicitada: Somar e incrementar contador apenas se o valor bruto for maior que zero
+        if (brutoEfetivoOS > 0) {
+          totalLiquidoGeral += liquidoEfetivoOS;
+          totalBrutoGeral += brutoEfetivoOS;
+          totalOSCount++;
+          
+          // Nome amigável para o gráfico exibindo Loja e OS
+          const rotuloGrafico = `Loja ${vendaOS.loja} - OS ${vendaOS.osOriginal}`;
+          vendasPorOS[rotuloGrafico] = liquidoEfetivoOS;
+        }
+      });
+
+      if (totalOSCount === 0 && totalLiquidoGeral === 0) {
+        document.getElementById("resultado").innerHTML = "<p class='erro'>Nenhum registro correspondente após o processamento.</p>";
+        atualizarKPIs(0, 0, 0, 0);
+        atualizarGraficoPorOS({});
         return;
       }
 
-      const ticketMedio = totalPedidos > 0 ? totalLiquido / totalPedidos : 0;
+      const ticketMedio = totalOSCount > 0 ? totalLiquidoGeral / totalOSCount : 0;
 
-      atualizarKPIs(totalLiquido, ticketMedio, totalPedidos);
-      atualizarGraficoPorLojas(vendasPorLoja);
+      atualizarKPIs(totalBrutoGeral, totalLiquidoGeral, ticketMedio, totalOSCount);
+      atualizarGraficoPorOS(vendasPorOS);
     }
 
-    function atualizarKPIs(liquido, ticket, pedidos) {
+    function atualizarKPIs(bruto, liquido, ticket, quantidade) {
+      document.getElementById("cardTotalBruto").textContent = moedaParaTextoBR(bruto);
       document.getElementById("cardTotalLiquido").textContent = moedaParaTextoBR(liquido);
       document.getElementById("cardTicketMedio").textContent = moedaParaTextoBR(ticket);
-      document.getElementById("cardTotalPedidos").textContent = pedidos.toLocaleString('pt-BR');
+      document.getElementById("cardTotalPedidos").textContent = quantidade.toLocaleString('pt-BR');
     }
 
-    function atualizarGraficoPorLojas(vendasPorLoja) {
+    function atualizarGraficoPorOS(vendasPorOS) {
       const ctx = document.getElementById('graficoVendasLoja').getContext('2d');
       
-      const labels = Object.keys(vendasPorLoja);
-      const valores = Object.values(vendasPorLoja);
+      const labels = Object.keys(vendasPorOS);
+      const valores = Object.values(vendasPorOS);
 
       if (meuGrafico) {
         meuGrafico.destroy();
@@ -363,7 +410,7 @@
         data: {
           labels: labels,
           datasets: [{
-            label: 'Total Líquido por Loja (R$)',
+            label: 'Valor Líquido da OS (R$)',
             data: valores,
             backgroundColor: '#0078d7',
             borderColor: '#005a9e',
@@ -378,7 +425,7 @@
             legend: { display: false },
             title: {
               display: true,
-              text: 'Desempenho de Vendas Líquidas por Loja',
+              text: 'Desempenho de Vendas Líquidas por Loja e Ordem de Serviço',
               font: { size: 16 }
             }
           },
