@@ -27,7 +27,9 @@ app.post("/consulta", async (req, res) => {
   console.log("Body enviado para ProdutosPorOSGrid:", body);
 
   try {
-    const response = await fetch("https://api.savwinweb.com.br/api/APIRelatoriosCR/ProdutosPorOSGrid", {
+    //const response = await fetch("https://api.savwinweb.com.br/api/APIRelatoriosCR/ProdutosPorOSGrid", {
+    const response = await fetch("https://api.savwinweb.com.br/api/APIDados/RetornaVendasPendentesCompletas{
+      
       method: "POST",
       headers: {
         "Content-Type": "application/json",
