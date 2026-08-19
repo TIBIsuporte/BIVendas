@@ -307,27 +307,32 @@
         if (!numOS) return;
 
         const vlrBrutoProdutoItem = formatarMoedaBR(item.VALORBRUTOPRODUTO);
+        const vlrLiquidoProdutoItem = formatarMoedaBR(item.LIQUIDOPRODUTO);
+        const vlrLiquidoVendaHeader = formatarMoedaBR(item.VLRLIQUIDOVENDA);
+        const tipoVenda = String(item.TIPOVENDA || "").trim().toUpperCase();
+
+        // Valor Bruto padrão (somando o bruto integral dos itens)
+        let brutoEfetivoItem = vlrBrutoProdutoItem;
 
         if (!osMap[numOS]) {
           osMap[numOS] = {
             loja: item.LOJA || "",
             data: item.DATA || "",
-            vlrLiquidoVenda: formatarMoedaBR(item.VLRLIQUIDOVENDA),
+            tipoVenda: tipoVenda,
+            vlrLiquidoVenda: vlrLiquidoVendaHeader,
             descontoVenda: formatarMoedaBR(item.DESCONTOVENDA),
-            vlrBrutoTotalVenda: vlrBrutoProdutoItem,
+            vlrBrutoTotalVenda: brutoEfetivoItem,
+            vlrLiquidoTotalItens: vlrLiquidoProdutoItem,
             itens: []
           };
         } else {
-          const vlrAtual = formatarMoedaBR(item.VLRLIQUIDOVENDA);
-          if (vlrAtual > osMap[numOS].vlrLiquidoVenda) {
-            osMap[numOS].vlrLiquidoVenda = vlrAtual;
-          }
+          osMap[numOS].vlrBrutoTotalVenda += brutoEfetivoItem;
+          osMap[numOS].vlrLiquidoTotalItens += vlrLiquidoProdutoItem;
+          
           const descAtual = formatarMoedaBR(item.DESCONTOVENDA);
           if (descAtual > osMap[numOS].descontoVenda) {
             osMap[numOS].descontoVenda = descAtual;
           }
-          // Soma o valor bruto do produto de cada item pertencente à mesma OS
-          osMap[numOS].vlrBrutoTotalVenda += vlrBrutoProdutoItem;
         }
 
         osMap[numOS].itens.push(item);
@@ -341,10 +346,17 @@
       // 2. Calcular os totais somando cada OS de forma única
       Object.keys(osMap).forEach(numOS => {
         const vendaOS = osMap[numOS];
-        totalLiquidoGeral += vendaOS.vlrLiquidoVenda;
+        
+        let liquidoEfetivoOS = vendaOS.vlrLiquidoVenda;
+        if (liquidoEfetivoOS === 0 && vendaOS.vlrLiquidoTotalItens !== 0) {
+          liquidoEfetivoOS = vendaOS.vlrLiquidoTotalItens;
+        }
+
+        totalLiquidoGeral += liquidoEfetivoOS;
         totalBrutoGeral += vendaOS.vlrBrutoTotalVenda;
         totalOSCount++;
-        vendasPorOS[numOS] = vendaOS.vlrLiquidoVenda;
+        
+        vendasPorOS[numOS] = liquidoEfetivoOS;
       });
 
       if (totalOSCount === 0 && totalLiquidoGeral === 0) {
