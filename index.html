@@ -299,12 +299,16 @@
         return;
       }
 
-      // 1. Agrupar os itens por Ordem de Serviço (OS)
+      // 1. Agrupar os itens por Loja + Ordem de Serviço (Chave Composta) para evitar conflitos
       const osMap = {};
 
       data.forEach(item => {
         const numOS = item.OS || item.CODIGODAVENDA;
+        const idLoja = item.LOJA || "GERAL";
         if (!numOS) return;
+
+        // Chave única combinando Loja e OS
+        const chaveUnica = `${idLoja}_${numOS}`;
 
         const vlrBrutoProdutoItem = formatarMoedaBR(item.VALORBRUTOPRODUTO);
         const vlrLiquidoProdutoItem = formatarMoedaBR(item.LIQUIDOPRODUTO);
@@ -312,12 +316,12 @@
         const tipoVenda = String(item.TIPOVENDA || "").trim().toUpperCase();
         const descontoVendaItem = formatarMoedaBR(item.DESCONTOVENDA);
 
-        // Valor Bruto padrão dos itens
         let brutoEfetivoItem = vlrBrutoProdutoItem;
 
-        if (!osMap[numOS]) {
-          osMap[numOS] = {
-            loja: item.LOJA || "",
+        if (!osMap[chaveUnica]) {
+          osMap[chaveUnica] = {
+            loja: idLoja,
+            osOriginal: numOS,
             data: item.DATA || "",
             tipoVenda: tipoVenda,
             vlrLiquidoVenda: vlrLiquidoVendaHeader,
@@ -327,15 +331,15 @@
             itens: []
           };
         } else {
-          osMap[numOS].vlrBrutoTotalVenda += brutoEfetivoItem;
-          osMap[numOS].vlrLiquidoTotalItens += vlrLiquidoProdutoItem;
+          osMap[chaveUnica].vlrBrutoTotalVenda += brutoEfetivoItem;
+          osMap[chaveUnica].vlrLiquidoTotalItens += vlrLiquidoProdutoItem;
           
-          if (descontoVendaItem > osMap[numOS].descontoVenda) {
-            osMap[numOS].descontoVenda = descontoVendaItem;
+          if (descontoVendaItem > osMap[chaveUnica].descontoVenda) {
+            osMap[chaveUnica].descontoVenda = descontoVendaItem;
           }
         }
 
-        osMap[numOS].itens.push(item);
+        osMap[chaveUnica].itens.push(item);
       });
 
       let totalLiquidoGeral = 0;
@@ -343,9 +347,9 @@
       let totalOSCount = 0;
       const vendasPorOS = {};
 
-      // 2. Calcular os totais somando cada OS de forma única e aplicando a regra de TROCA
-      Object.keys(osMap).forEach(numOS => {
-        const vendaOS = osMap[numOS];
+      // 2. Calcular os totais somando cada OS de forma única e aplicando a regra de validação
+      Object.keys(osMap).forEach(chaveUnica => {
+        const vendaOS = osMap[chaveUnica];
         
         let liquidoEfetivoOS = vendaOS.vlrLiquidoVenda;
         if (liquidoEfetivoOS === 0 && vendaOS.vlrLiquidoTotalItens !== 0) {
@@ -359,12 +363,16 @@
           brutoEfetivoOS -= vendaOS.descontoVenda;
         }
 
-        totalLiquidoGeral += liquidoEfetivoOS;
-        totalBrutoGeral += brutoEfetivoOS;
-	if (brutoEfetivoOS > 0) {
-        	totalOSCount++;
+        // Condição solicitada: Somar e incrementar contador apenas se o valor bruto for maior que zero
+        if (brutoEfetivoOS > 0) {
+          totalLiquidoGeral += liquidoEfetivoOS;
+          totalBrutoGeral += brutoEfetivoOS;
+          totalOSCount++;
+          
+          // Nome amigável para o gráfico exibindo Loja e OS
+          const rotuloGrafico = `Loja ${vendaOS.loja} - OS ${vendaOS.osOriginal}`;
+          vendasPorOS[rotuloGrafico] = liquidoEfetivoOS;
         }
-        vendasPorOS[numOS] = liquidoEfetivoOS;
       });
 
       if (totalOSCount === 0 && totalLiquidoGeral === 0) {
@@ -390,7 +398,7 @@
     function atualizarGraficoPorOS(vendasPorOS) {
       const ctx = document.getElementById('graficoVendasLoja').getContext('2d');
       
-      const labels = Object.keys(vendasPorOS).map(os => 'OS ' + os);
+      const labels = Object.keys(vendasPorOS);
       const valores = Object.values(vendasPorOS);
 
       if (meuGrafico) {
@@ -417,7 +425,7 @@
             legend: { display: false },
             title: {
               display: true,
-              text: 'Desempenho de Vendas Líquidas por Ordem de Serviço (OS)',
+              text: 'Desempenho de Vendas Líquidas por Loja e Ordem de Serviço',
               font: { size: 16 }
             }
           },
