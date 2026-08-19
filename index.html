@@ -338,8 +338,8 @@
         if (v.tipoVenda ==="DEVOLUCAO") {
           // Como a devolução já vem negativa do banco, subtraímos o valor absoluto dela do total líquido e bruto
           const valorDevolucao = Math.abs(liq !== 0 ? liq : v.vlrLiquidoTotalItens);
-          liq -= valorDevolucao;
-          bru -= Math.abs(bru !== 0 ? bru : v.vlrBrutoTotalVenda);
+          liq += valorDevolucao;
+          //bru += Math.abs(bru !== 0 ? bru : v.vlrBrutoTotalVenda);
           tDev += valorDevolucao; // Acumula no card de devoluções
         }
 
