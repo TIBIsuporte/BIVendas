@@ -331,12 +331,11 @@
         let bru = v.vlrBrutoTotalVenda;
         let desc = v.totalDescontosItens > 0 ? v.totalDescontosItens : v.descontoVenda;
 
-        const ehDevolucao = v.tipoVenda.includes("DEVOLUCAO") || v.tipoVenda.includes("DEVOLUÇÃO");
-
+   
         if (v.tipoVenda === "TROCA") {
           bru -= v.descontoVenda;
         } 
-        if (ehDevolucao) {
+        if (v.tipoVenda ==="DEVOLUCAO") {
           // Como a devolução já vem negativa do banco, subtraímos o valor absoluto dela do total líquido e bruto
           const valorDevolucao = Math.abs(liq !== 0 ? liq : v.vlrLiquidoTotalItens);
           liq -= valorDevolucao;
