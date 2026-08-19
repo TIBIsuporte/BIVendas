@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Dashboard de Performance Comercial - BI Vendas</title>
+  <title>Dashboard de Performance Comercial - BI Vendas com Debug</title>
   <!-- Importando Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Importando Chart.js para os gráficos -->
@@ -39,6 +39,13 @@
     .input-grupo { display: flex; gap: 10px; align-items: center; }
     .btn-modal { background: #6c757d; white-space: nowrap; }
     .btn-modal:hover { background: #5a6268; }
+
+    /* Terminal de Debug Visual */
+    .debug-container { background: #1e1e1e; color: #00ff00; font-family: monospace; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+    .debug-header { font-weight: bold; border-bottom: 1px solid #444; margin-bottom: 8px; padding-bottom: 4px; color: #fff; display: flex; justify-content: space-between; align-items: center; }
+    .debug-body { max-height: 180px; overflow-y: auto; font-size: 12px; line-height: 1.4; }
+    .btn-limpar-log { background: #333; color: #fff; border: none; padding: 3px 8px; font-size: 10px; cursor: pointer; border-radius: 3px; }
+    .btn-limpar-log:hover { background: #555; }
 
     /* Cards de BI / Indicadores (6 colunas) */
     .bi-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; margin-bottom: 20px; }
@@ -111,6 +118,15 @@
     <button class="btn-acao" onclick="consultar()">Consultar Dashboard</button>
   </div>
 
+  <!-- Terminal de Debug Visual em Tempo Real -->
+  <div class="debug-container">
+    <div class="debug-header">
+      <span>💻 Terminal de Depuração (Log em Tempo Real)</span>
+      <button class="btn-limpar-log" onclick="document.getElementById('terminalLog').innerHTML=''">Limpar Logs</button>
+    </div>
+    <div id="terminalLog" class="debug-body">Aguardando execução da consulta...</div>
+  </div>
+
   <div id="resultado"></div>
 
   <div class="bi-cards">
@@ -146,7 +162,7 @@
 
   <!-- Grid de Auditoria de OS -->
   <div class="grid-container">
-    <h3>Grid de Auditoria / Conferência de OS Consolidada (Sem Filtros Ocultos)</h3>
+    <h3>Grid de Auditoria / Conferência de OS Consolidada</h3>
     <div class="table-wrapper">
       <table id="tabelaAuditoria">
         <thead>
@@ -205,6 +221,24 @@
     let lojasDisponiveis = [];
     let meuGrafico = null;
 
+    // Função de Debug Visual na Tela
+    function logDebug(mensagem, dados = null) {
+      const terminal = document.getElementById("terminalLog");
+      if (!terminal) return;
+      const hora = new Date().toLocaleTimeString();
+      let textoDados = "";
+      if (dados !== null) {
+        try {
+          textoDados = " => " + JSON.stringify(dados);
+        } catch (e) {
+          textoDados = " => [Objeto]";
+        }
+      }
+      terminal.innerHTML += `<div>[${hora}] ${mensagem}${textoDados}</div>`;
+      terminal.scrollTop = terminal.scrollHeight;
+      console.log(`[BI DEBUG] ${mensagem}`, dados || "");
+    }
+
     window.onload = async () => {
       try {
         const { data, error } = await supabaseClient
@@ -214,8 +248,9 @@
         
         if (error) throw error;
         lojasDisponiveis = data || [];
+        logDebug(`Lojas carregadas com sucesso: ${lojasDisponiveis.length} lojas.`);
       } catch (err) {
-        console.error("Erro ao carregar lojas do Supabase:", err.message);
+        logDebug(`ERRO ao carregar lojas do Supabase: ${err.message}`);
       }
     };
 
@@ -291,6 +326,7 @@
     async function consultar() {
       document.getElementById("loadingOverlay").style.display = "flex";
       document.getElementById("resultado").innerHTML = "";
+      document.getElementById("terminalLog").innerHTML = ""; // Limpa o terminal a cada nova busca
 
       const body = {
         DATAINICIAL: formatarDataISOparaBR(document.getElementById("dataInicial").value),
@@ -298,15 +334,23 @@
         LOJAS: document.getElementById("lojas").value
       };
 
+      logDebug("Iniciando requisição para o endpoint /consulta com parâmetros:", body);
+
       try {
         const response = await fetch("/consulta", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body)
         });
-        if (!response.ok) throw new Error("Erro na requisição: " + response.status);
-        processarEExibirBI(await response.json());
+        
+        if (!response.ok) throw new Error("Erro na requisição HTTP: " + response.status);
+        
+        const dadosApi = await response.json();
+        logDebug(`API respondeu com sucesso! Total de registros brutos recebidos: ${dadosApi.length}`);
+        
+        processarEExibirBI(dadosApi);
       } catch (error) {
+        logDebug(`❌ ERRO CRÍTICO: ${error.message}`);
         document.getElementById("resultado").innerHTML = "<p class='erro'>" + error.message + "</p>";
         atualizarKPIs(0, 0, 0, 0, 0, 0);
         atualizarGraficoPizza({});
@@ -318,6 +362,7 @@
 
     function processarEExibirBI(data) {
       if (!data || data.length === 0) {
+        logDebug("Aviso: Nenhum dado retornado para processar.");
         document.getElementById("resultado").innerHTML = "<p class='erro'>Nenhum resultado encontrado.</p>";
         atualizarKPIs(0, 0, 0, 0, 0, 0);
         atualizarGraficoPizza({});
@@ -326,11 +371,21 @@
       }
 
       const osMap = {};
-      data.forEach(item => {
-        // Captura universal de OS independente da capitalização dos campos da API
+      
+      data.forEach((item, index) => {
         const numOS = item.OS || item.CODIGODAVENDA || item.os || item.codigoDaVenda || "SEM_NUMERO";
         const idLoja = item.LOJA || item.loja || "sem-loja";
         const chaveUnica = `${idLoja}_${numOS}`;
+
+        // Rastreamento específico para a OS 44665 que você citou
+        if (String(numOS) === "44665") {
+          logDebug(`🔍 [ALVO ENCONTRADO] Linha #${index} da OS 44665 detectada!`, {
+            tipoVenda: item.TIPOVENDA || item.tipoVenda,
+            vlrLiquido: item.VLRLIQUIDOVENDA || item.vlrLiquidoVenda,
+            vlrLiquidoProduto: item.LIQUIDOPRODUTO || item.liquidoProduto,
+            brutoProduto: item.VALORBRUTOPRODUTO || item.valorBrutoProduto
+          });
+        }
 
         const vlrLiquidoVenda = formatarMoedaBR(item.VLRLIQUIDOVENDA ?? item.vlrLiquidoVenda);
         const descontoVenda = formatarMoedaBR(item.DESCONTOVENDA ?? item.descontoVenda);
@@ -359,6 +414,8 @@
         }
       });
 
+      logDebug(`Agrupamento concluído. Total de OS consolidadas únicas: ${Object.keys(osMap).length}`);
+
       let tLiq = 0, tBru = 0, tDev = 0, tDesc = 0, tOS = 0;
       const vendasPorLoja = {};
       const listaAuditoria = [];
@@ -366,7 +423,6 @@
       Object.keys(osMap).forEach(chave => {
         const v = osMap[chave];
         
-        // CORREÇÃO CRUCIAL: Se o valor líquido da venda principal veio zero, assumimos o acumulado dos itens
         let liq = v.vlrLiquidoVenda !== 0 ? v.vlrLiquidoVenda : v.vlrLiquidoTotalItens;
         let bru = v.vlrBrutoTotalVenda !== 0 ? v.vlrBrutoTotalVenda : liq;
         let desc = v.totalDescontosItens > 0 ? v.totalDescontosItens : v.descontoVenda;
@@ -386,9 +442,17 @@
         tLiq += liq;
         tBru += bru;
         tDesc += Math.abs(desc);
-        tOS++; // Conta todas as OS sem exclusão
+        tOS++;
 
-        // Buscar nome da loja
+        if (String(v.numOS) === "44665") {
+          logDebug(`🎯 [RESULTADO FINAL DA OS 44665]`, {
+            tipo: tipoVendaNorm,
+            calculadoBruto: bru,
+            calculadoLiquido: liq,
+            calculadoDesconto: desc
+          });
+        }
+
         let nomeLojaStr = `Loja ${v.loja}`;
         const lojaEncontrada = lojasDisponiveis.find(l => String(l.id) === String(v.loja));
         if (lojaEncontrada) {
@@ -411,13 +475,13 @@
         });
       });
 
-      // Ordenar por número da OS em ordem crescente
       listaAuditoria.sort((a, b) => {
         const numA = Number(a.numOS) || 0;
         const numB = Number(b.numOS) || 0;
         return numA - numB;
       });
 
+      logDebug("Processamento de BI finalizado. Renderizando cards e tabela...");
       atualizarKPIs(tBru, tLiq, tDev, tDesc, tOS > 0 ? tLiq / tOS : 0, tOS);
       atualizarGraficoPizza(vendasPorLoja);
       renderizarGridAuditoria(listaAuditoria);
