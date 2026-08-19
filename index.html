@@ -2,11 +2,9 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Dashboard de Performance Comercial - BI Vendas</title>
+  <title>Consulta de Dados - BI Vendas</title>
   <!-- Importando Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Importando Chart.js para os gráficos -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     body { font-family: "Segoe UI", Arial, sans-serif; margin: 20px; background: #f4f6f9; }
@@ -16,10 +14,9 @@
       justify-content: space-between;
       align-items: center;
       margin-bottom: 20px;
-      padding-bottom: 10px;
+      padding: 20px;
       border-bottom: 10px solid #0078d7;
       background: #fff;
-      padding: 20px;
       border-radius: 8px;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
@@ -27,7 +24,7 @@
     h2 { color: #0078d7; margin: 0; }
     .titulo-aga { font-style: italic; color: #333; font-size: 1.2em; font-weight: bold; }
 
-    /* Seção de Filtros no Topo */
+    /* Seção de Filtros */
     .filtros { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
     .linha { display: flex; gap: 20px; margin-top: 10px; }
     .linha label { flex: 1; font-weight: bold; font-size: 14px; color: #333; }
@@ -40,26 +37,15 @@
     .btn-modal { background: #6c757d; white-space: nowrap; }
     .btn-modal:hover { background: #5a6268; }
 
-    /* Cards de BI / Indicadores (6 colunas) */
-    .bi-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; margin-bottom: 20px; }
-    .card { background: #fff; padding: 20px; border-radius: 8px; border-left: 5px solid #0078d7; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-    .card h4 { margin: 0; color: #666; font-size: 0.8em; text-transform: uppercase; }
-    .card p { margin: 10px 0 0; font-size: 1.3em; font-weight: bold; color: #333; }
-    .card.devolucao { border-left-color: #dc3545; }
-    .card.devolucao p { color: #dc3545; }
-
-    /* Área do Gráfico */
-    .chart-container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; height: 450px; display: flex; justify-content: center; align-items: center; position: relative; }
-
-    /* Grid de Auditoria */
-    .grid-container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
-    .grid-container h3 { margin-top: 0; color: #0078d7; font-size: 1.1em; }
-    .table-wrapper { max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; }
+    /* Grid Principal de Dados */
+    .grid-container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .grid-container h3 { margin-top: 0; color: #0078d7; font-size: 1.1em; display: flex; justify-content: space-between; align-items: center; }
+    .table-wrapper { max-height: 65vh; overflow: auto; border: 1px solid #ddd; border-radius: 4px; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
-    th, td { padding: 8px 12px; border-bottom: 1px solid #eee; }
-    th { background: #0078d7; color: #fff; position: sticky; top: 0; z-index: 10; }
-    tr:hover { background: #f1f1f1; }
-    .text-right { text-align: right; }
+    th, td { padding: 8px 12px; border-bottom: 1px solid #eee; border-right: 1px solid #eee; white-space: nowrap; }
+    th { background: #0078d7; color: #fff; position: sticky; top: 0; z-index: 10; text-transform: uppercase; font-size: 12px; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+    tr:hover { background-color: #f1f1f1; }
 
     /* Modal Lojas */
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
@@ -87,7 +73,7 @@
 <body>
 
   <div class="header-titulo">
-    <h2>Dashboard de Performance Comercial - BI Vendas</h2>
+    <h2>Consulta de Dados Brutos - BI Vendas</h2>
     <span class="titulo-aga">by AGA</span>
   </div>
 
@@ -108,61 +94,27 @@
         <input type="date" id="dataFinal">
       </label>
     </div>
-    <button class="btn-acao" onclick="consultar()">Consultar Dashboard</button>
+    <button class="btn-acao" onclick="consultar()">Consultar Dados</button>
   </div>
 
   <div id="resultado"></div>
 
-  <div class="bi-cards">
-    <div class="card">
-      <h4>Total Vendas (Bruto)</h4>
-      <p id="cardTotalBruto">R$ 0,00</p>
-    </div>
-    <div class="card">
-      <h4>Total Vendas (Líquido)</h4>
-      <p id="cardTotalLiquido">R$ 0,00</p>
-    </div>
-    <div class="card devolucao">
-      <h4>Total Devoluções</h4>
-      <p id="cardTotalDevolucoes">R$ 0,00</p>
-    </div>
-    <div class="card">
-      <h4>Total Descontos</h4>
-      <p id="cardTotalDesconto">R$ 0,00</p>
-    </div>
-    <div class="card">
-      <h4>Ticket Médio</h4>
-      <p id="cardTicketMedio">R$ 0,00</p>
-    </div>
-    <div class="card">
-      <h4>Total de Ordens (OS)</h4>
-      <p id="cardTotalPedidos">0</p>
-    </div>
-  </div>
-
-  <div class="chart-container">
-    <canvas id="graficoVendasLoja"></canvas>
-  </div>
-
-  <!-- Grid de Auditoria de OS -->
+  <!-- Grid com Renderização Dinâmica -->
   <div class="grid-container">
-    <h3>Grid de Auditoria / Conferência de OS Consolidada</h3>
+    <h3>
+      <span>Resultado da Consulta</span>
+      <span id="totalRegistros" style="font-size: 13px; color: #555;">0 registros encontados</span>
+    </h3>
     <div class="table-wrapper">
-      <table id="tabelaAuditoria">
-        <thead>
+      <table id="tabelaDados">
+        <thead id="cabecalhoTabela">
           <tr>
-            <th>Loja</th>
-            <th>Nº OS / Venda</th>
-            <th>Tipo Venda</th>
-            <th class="text-right">Bruto (Calculado)</th>
-            <th class="text-right">Líquido (Calculado)</th>
-            <th class="text-right">Devolução</th>
-            <th class="text-right">Desconto</th>
+            <th>Aguardando Consulta</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="corpoTabela">
           <tr>
-            <td colspan="7" style="text-align: center; color: #777;">Nenhuma consulta realizada ainda.</td>
+            <td style="text-align: center; color: #777;">Preencha os filtros acima e clique em Consultar Dados.</td>
           </tr>
         </tbody>
       </table>
@@ -171,7 +123,7 @@
 
   <div id="loadingOverlay" class="loading-overlay">
     <div class="spinner"></div>
-    <div class="loading-text">Processando indicadores de BI, por favor aguarde...</div>
+    <div class="loading-text">Buscando dados na API, aguarde...</div>
   </div>
 
   <!-- Modal Lojas -->
@@ -203,7 +155,6 @@
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let lojasDisponiveis = [];
-    let meuGrafico = null;
 
     window.onload = async () => {
       try {
@@ -278,16 +229,6 @@
       return `${p[2]}/${p[1]}/${p[0]}`;
     }
 
-    function formatarMoedaBR(valor) {
-      if (valor === null || valor === undefined || valor === "") return 0;
-      const n = Number(String(valor).replace(",", "."));
-      return isNaN(n) ? 0 : n;
-    }
-
-    function moedaParaTextoBR(valor) {
-      return Number(valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    }
-
     async function consultar() {
       document.getElementById("loadingOverlay").style.display = "flex";
       document.getElementById("resultado").innerHTML = "";
@@ -308,194 +249,67 @@
         if (!response.ok) throw new Error("Erro na requisição HTTP: " + response.status);
         
         const dadosApi = await response.json();
-        processarEExibirBI(dadosApi);
+        renderizarGridPuro(dadosApi);
       } catch (error) {
         document.getElementById("resultado").innerHTML = "<p class='erro'>" + error.message + "</p>";
-        atualizarKPIs(0, 0, 0, 0, 0, 0);
-        atualizarGraficoPizza({});
-        renderizarGridAuditoria([]);
+        limparTabela();
       } finally {
         document.getElementById("loadingOverlay").style.display = "none";
       }
     }
 
-    function processarEExibirBI(data) {
-      if (!data || data.length === 0) {
-        document.getElementById("resultado").innerHTML = "<p class='erro'>Nenhum resultado encontrado.</p>";
-        atualizarKPIs(0, 0, 0, 0, 0, 0);
-        atualizarGraficoPizza({});
-        renderizarGridAuditoria([]);
-        return;
-      }
+    function renderizarGridPuro(dados) {
+      const thead = document.getElementById("cabecalhoTabela");
+      const tbody = document.getElementById("corpoTabela");
+      const labelTotal = document.getElementById("totalRegistros");
 
-      const osMap = {};
-      
-      data.forEach((item) => {
-        const numOS = item.OS || item.CODIGODAVENDA || item.os || item.codigoDaVenda || item.CodigoDaVenda || item.NUMEROOS || "SEM_NUMERO";
-        const idLoja = item.LOJA || item.loja || item.IdLoja || "sem-loja";
-        const chaveUnica = `${idLoja}_${numOS}`;
-
-        const vlrLiquidoVenda = formatarMoedaBR(item.VLRLIQUIDOVENDA ?? item.vlrLiquidoVenda ?? item.liquidoVenda);
-        const descontoVenda = formatarMoedaBR(item.DESCONTOVENDA ?? item.descontoVenda);
-        const vlrBrutoProduto = formatarMoedaBR(item.VALORBRUTOPRODUTO ?? item.valorBrutoProduto ?? item.brutoProduto);
-        const liquidoProduto = formatarMoedaBR(item.LIQUIDOPRODUTO ?? item.liquidoProduto);
-        const descontoProduto = Math.abs(formatarMoedaBR(item.DESCONTOVALORPRODUTO ?? item.descontoValorProduto));
-
-        if (!osMap[chaveUnica]) {
-          osMap[chaveUnica] = {
-            loja: idLoja,
-            numOS: numOS,
-            tipoVenda: String(item.TIPOVENDA || item.tipoVenda || "NÃO INFORMADO").trim().toUpperCase(),
-            vlrLiquidoVenda: vlrLiquidoVenda,
-            descontoVenda: descontoVenda,
-            vlrBrutoTotalVenda: vlrBrutoProduto,
-            vlrLiquidoTotalItens: liquidoProduto,
-            totalDescontosItens: descontoProduto
-          };
-        } else {
-          osMap[chaveUnica].vlrBrutoTotalVenda += vlrBrutoProduto;
-          osMap[chaveUnica].vlrLiquidoTotalItens += liquidoProduto;
-          osMap[chaveUnica].totalDescontosItens += descontoProduto;
-          if (descontoVenda > osMap[chaveUnica].descontoVenda) {
-            osMap[chaveUnica].descontoVenda = descontoVenda;
-          }
-        }
-      });
-
-      let tLiq = 0, tBru = 0, tDev = 0, tDesc = 0, tOS = 0;
-      const vendasPorLoja = {};
-      const listaAuditoria = [];
-
-      Object.keys(osMap).forEach(chave => {
-        const v = osMap[chave];
-        
-        let liq = v.vlrLiquidoVenda !== 0 ? v.vlrLiquidoVenda : v.vlrLiquidoTotalItens;
-        let bru = v.vlrBrutoTotalVenda !== 0 ? v.vlrBrutoTotalVenda : liq;
-        let desc = v.totalDescontosItens > 0 ? v.totalDescontosItens : v.descontoVenda;
-
-        const tipoVendaNorm = v.tipoVenda;
-        let valorDevolucaoLinha = 0;
-
-        if (tipoVendaNorm === "TROCA") {
-          bru -= v.descontoVenda;
-        } 
-        
-        if (tipoVendaNorm === "DEVOLUCAO") {
-          valorDevolucaoLinha = Math.abs(liq !== 0 ? liq : v.vlrLiquidoTotalItens);
-          tDev += valorDevolucaoLinha; 
-        }
-
-        tLiq += liq;
-        tBru += bru;
-        tDesc += Math.abs(desc);
-        tOS++;
-
-        let nomeLojaStr = `Loja ${v.loja}`;
-        const lojaEncontrada = lojasDisponiveis.find(l => String(l.id) === String(v.loja));
-        if (lojaEncontrada) {
-          nomeLojaStr = `[${lojaEncontrada.id}] ${lojaEncontrada.nome}`;
-        }
-
-        if (!vendasPorLoja[nomeLojaStr]) {
-          vendasPorLoja[nomeLojaStr] = 0;
-        }
-        vendasPorLoja[nomeLojaStr] += liq;
-
-        listaAuditoria.push({
-          loja: nomeLojaStr,
-          numOS: v.numOS,
-          tipoVenda: tipoVendaNorm,
-          bruto: bru,
-          liquido: liq,
-          devolucao: valorDevolucaoLinha,
-          desconto: Math.abs(desc)
-        });
-      });
-
-      listaAuditoria.sort((a, b) => {
-        const numA = Number(a.numOS) || 0;
-        const numB = Number(b.numOS) || 0;
-        return numA - numB;
-      });
-
-      atualizarKPIs(tBru, tLiq, tDev, tDesc, tOS > 0 ? tLiq / tOS : 0, tOS);
-      atualizarGraficoPizza(vendasPorLoja);
-      renderizarGridAuditoria(listaAuditoria);
-    }
-
-    function atualizarKPIs(bruto, liquido, devolucao, desconto, ticket, qtd) {
-      document.getElementById("cardTotalBruto").textContent = moedaParaTextoBR(bruto);
-      document.getElementById("cardTotalLiquido").textContent = moedaParaTextoBR(liquido);
-      document.getElementById("cardTotalDevolucoes").textContent = moedaParaTextoBR(devolucao);
-      document.getElementById("cardTotalDesconto").textContent = moedaParaTextoBR(desconto);
-      document.getElementById("cardTicketMedio").textContent = moedaParaTextoBR(ticket);
-      document.getElementById("cardTotalPedidos").textContent = qtd.toLocaleString('pt-BR');
-    }
-
-    function renderizarGridAuditoria(lista) {
-      const tbody = document.querySelector("#tabelaAuditoria tbody");
+      thead.innerHTML = "";
       tbody.innerHTML = "";
 
-      if (!lista || lista.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #777;">Nenhum registro para exibir.</td></tr>`;
+      if (!dados || dados.length === 0) {
+        labelTotal.textContent = "0 registros encontrados";
+        thead.innerHTML = "<tr><th>Mensagem</th></tr>";
+        tbody.innerHTML = "<tr><td style='text-align: center;'>Nenhum registro encontrado para os filtros selecionados.</td></tr>";
         return;
       }
 
-      lista.forEach(item => {
-        const isAlvo = String(item.numOS) === "44665";
-        const estiloLinha = isAlvo ? 'background-color: #fff3cd; font-weight: bold; border: 2px solid #ffc107;' : '';
+      labelTotal.textContent = `${dados.length.toLocaleString('pt-BR')} registros encontrados`;
 
-        tbody.innerHTML += `
-          <tr style="${estiloLinha}">
-            <td>${item.loja}</td>
-            <td><strong>${item.numOS}</strong> ${isAlvo ? '🔍 (OS 44665)' : ''}</td>
-            <td><span style="padding: 2px 6px; background: #e9ecef; border-radius: 4px; font-size: 11px;">${item.tipoVenda}</span></td>
-            <td class="text-right">${moedaParaTextoBR(item.bruto)}</td>
-            <td class="text-right">${moedaParaTextoBR(item.liquido)}</td>
-            <td class="text-right" style="color: ${item.devolucao > 0 ? '#dc3545' : 'inherit'}; font-weight: ${item.devolucao > 0 ? 'bold' : 'normal'};">${moedaParaTextoBR(item.devolucao)}</td>
-            <td class="text-right">${moedaParaTextoBR(item.desconto)}</td>
-          </tr>
-        `;
+      // Captura os nomes das chaves do primeiro objeto do array
+      const colunas = Object.keys(dados[0]);
+
+      // Monta o Cabeçalho (TH) dinamicamente
+      let trHead = document.createElement("tr");
+      colunas.forEach(coluna => {
+        let th = document.createElement("th");
+        th.textContent = coluna;
+        trHead.appendChild(th);
+      });
+      thead.appendChild(trHead);
+
+      // Monta as Linhas (TR) e Células (TD) dinamicamente
+      dados.forEach(item => {
+        let tr = document.createElement("tr");
+        colunas.forEach(coluna => {
+          let td = document.createElement("td");
+          let valor = item[coluna];
+
+          // Trata valores nulos ou indefinições
+          if (valor === null || valor === undefined) {
+            valor = "-";
+          }
+
+          td.textContent = valor;
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
       });
     }
 
-    function atualizarGraficoPizza(vendasPorLoja) {
-      const ctx = document.getElementById('graficoVendasLoja').getContext('2d');
-      if (meuGrafico) meuGrafico.destroy();
-
-      const labels = Object.keys(vendasPorLoja);
-      const dataValues = Object.values(vendasPorLoja);
-      const totalGeral = dataValues.reduce((acc, val) => acc + val, 0);
-
-      meuGrafico = new Chart(ctx, {
-        type: 'pie',
-        data: {
-          labels: labels,
-          datasets: [{
-            data: dataValues,
-            backgroundColor: [
-              '#0078d7', '#28a745', '#ffc107', '#dc3545', '#6f42c1', 
-              '#20c997', '#fd7e14', '#e83e8c', '#17a2b8', '#6c757d'
-            ]
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { position: 'right' },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  const valor = context.raw || 0;
-                  const percentual = totalGeral > 0 ? ((valor / totalGeral) * 100).toFixed(2) : 0;
-                  return ` Valor Líquido: ${moedaParaTextoBR(valor)} (${percentual}%)`;
-                }
-              }
-            }
-          }
-        }
-      });
+    function limparTabela() {
+      document.getElementById("totalRegistros").textContent = "0 registros encontrados";
+      document.getElementById("cabecalhoTabela").innerHTML = "<tr><th>Status</th></tr>";
+      document.getElementById("corpoTabela").innerHTML = "<tr><td style='text-align: center; color: red;'>Erro ao carregar dados.</td></tr>";
     }
   </script>
 </body>
