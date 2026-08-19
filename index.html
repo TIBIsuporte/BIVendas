@@ -40,7 +40,7 @@
     .btn-modal { background: #6c757d; white-space: nowrap; }
     .btn-modal:hover { background: #5a6268; }
 
-    /* Cards de BI / Indicadores (Atualizado para 6 colunas) */
+    /* Cards de BI / Indicadores (6 colunas) */
     .bi-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; margin-bottom: 20px; }
     .card { background: #fff; padding: 20px; border-radius: 8px; border-left: 5px solid #0078d7; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
     .card h4 { margin: 0; color: #666; font-size: 0.8em; text-transform: uppercase; }
@@ -331,14 +331,16 @@
         let bru = v.vlrBrutoTotalVenda;
         let desc = v.totalDescontosItens > 0 ? v.totalDescontosItens : v.descontoVenda;
 
-        // Regras para TROCA e DEVOLUCAO
+        // Verifica de forma abrangente se o tipo de venda contém "DEVOLUCAO" ou "DEVOLUÇÃO"
+        const ehDevolucao = v.tipoVenda.includes("DEVOLUCAO") || v.tipoVenda.includes("DEVOLUÇÃO");
+
         if (v.tipoVenda === "TROCA") {
           bru -= v.descontoVenda;
-        } else if (v.tipoVenda === "DEVOLUCAO") {
-          // Garante que o líquido e bruto entrem negativos para abater o faturamento
+        } else if (ehDevolucao) {
+          // Subtrai do líquido e do bruto tornando-os negativos para o abatimento correto
           liq = -Math.abs(liq !== 0 ? liq : v.vlrLiquidoTotalItens);
-          bru = -Math.abs(bru);
-          tDev += Math.abs(liq); // Acumula o valor absoluto para o card de devoluções
+          bru = -Math.abs(bru !== 0 ? bru : v.vlrBrutoTotalVenda);
+          tDev += Math.abs(liq); // Soma para o card exclusivo de devoluções
         }
 
         tLiq += liq;
