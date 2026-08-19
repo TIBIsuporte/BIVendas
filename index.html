@@ -146,7 +146,7 @@
 
   <!-- Grid de Auditoria de OS -->
   <div class="grid-container">
-    <h3>Grid de Auditoria / Conferência de OS Consolidada (Forçada sem Omissão)</h3>
+    <h3>Grid de Auditoria / Conferência de OS Consolidada (Sem Filtros Ocultos)</h3>
     <div class="table-wrapper">
       <table id="tabelaAuditoria">
         <thead>
@@ -279,7 +279,8 @@
     }
 
     function formatarMoedaBR(valor) {
-      const n = Number(String(valor || 0).replace(",", "."));
+      if (valor === null || valor === undefined || valor === "") return 0;
+      const n = Number(String(valor).replace(",", "."));
       return isNaN(n) ? 0 : n;
     }
 
@@ -326,7 +327,7 @@
 
       const osMap = {};
       data.forEach(item => {
-        // CAPTURA SEGURA DA OS: Garante identificação mesmo se o nome da propriedade variar
+        // Captura universal de OS independente da capitalização dos campos da API
         const numOS = item.OS || item.CODIGODAVENDA || item.os || item.codigoDaVenda || "SEM_NUMERO";
         const idLoja = item.LOJA || item.loja || "sem-loja";
         const chaveUnica = `${idLoja}_${numOS}`;
@@ -341,7 +342,7 @@
           osMap[chaveUnica] = {
             loja: idLoja,
             numOS: numOS,
-            tipoVenda: String(item.TIPOVENDA || item.tipoVenda || "").trim().toUpperCase(),
+            tipoVenda: String(item.TIPOVENDA || item.tipoVenda || "NÃO INFORMADO").trim().toUpperCase(),
             vlrLiquidoVenda: vlrLiquidoVenda,
             descontoVenda: descontoVenda,
             vlrBrutoTotalVenda: vlrBrutoProduto,
@@ -364,8 +365,10 @@
 
       Object.keys(osMap).forEach(chave => {
         const v = osMap[chave];
+        
+        // CORREÇÃO CRUCIAL: Se o valor líquido da venda principal veio zero, assumimos o acumulado dos itens
         let liq = v.vlrLiquidoVenda !== 0 ? v.vlrLiquidoVenda : v.vlrLiquidoTotalItens;
-        let bru = v.vlrBrutoTotalVenda;
+        let bru = v.vlrBrutoTotalVenda !== 0 ? v.vlrBrutoTotalVenda : liq;
         let desc = v.totalDescontosItens > 0 ? v.totalDescontosItens : v.descontoVenda;
 
         const tipoVendaNorm = v.tipoVenda;
@@ -383,9 +386,7 @@
         tLiq += liq;
         tBru += bru;
         tDesc += Math.abs(desc);
-        
-        // CONTAGEM AMPLIADA: Conta todas as OS processadas sem exclusão arbitrária
-        tOS++;
+        tOS++; // Conta todas as OS sem exclusão
 
         // Buscar nome da loja
         let nomeLojaStr = `Loja ${v.loja}`;
@@ -399,11 +400,10 @@
         }
         vendasPorLoja[nomeLojaStr] += liq;
 
-        // Guardar para o grid de auditoria (ordenação amigável por número de OS se possível)
         listaAuditoria.push({
           loja: nomeLojaStr,
           numOS: v.numOS,
-          tipoVenda: tipoVendaNorm || "NÃO INFORMADO",
+          tipoVenda: tipoVendaNorm,
           bruto: bru,
           liquido: liq,
           devolucao: valorDevolucaoLinha,
@@ -411,7 +411,7 @@
         });
       });
 
-      // Ordenar a lista de auditoria por número de OS para ficar fácil de achar a 44665
+      // Ordenar por número da OS em ordem crescente
       listaAuditoria.sort((a, b) => {
         const numA = Number(a.numOS) || 0;
         const numB = Number(b.numOS) || 0;
@@ -442,14 +442,13 @@
       }
 
       lista.forEach(item => {
-        // Destaque visual especial se for a OS 44665 para você achá-la rápido
         const isAlvo = String(item.numOS) === "44665";
-        const estiloLinha = isAlvo ? 'background-color: #fff3cd; font-weight: bold;' : '';
+        const estiloLinha = isAlvo ? 'background-color: #fff3cd; font-weight: bold; border: 2px solid #ffc107;' : '';
 
         tbody.innerHTML += `
           <tr style="${estiloLinha}">
             <td>${item.loja}</td>
-            <td><strong>${item.numOS}</strong> ${isAlvo ? '🔍 (Alvo)' : ''}</td>
+            <td><strong>${item.numOS}</strong> ${isAlvo ? '🔍 (OS 44665)' : ''}</td>
             <td><span style="padding: 2px 6px; background: #e9ecef; border-radius: 4px; font-size: 11px;">${item.tipoVenda}</span></td>
             <td class="text-right">${moedaParaTextoBR(item.bruto)}</td>
             <td class="text-right">${moedaParaTextoBR(item.liquido)}</td>
@@ -466,7 +465,6 @@
 
       const labels = Object.keys(vendasPorLoja);
       const dataValues = Object.values(vendasPorLoja);
-      
       const totalGeral = dataValues.reduce((acc, val) => acc + val, 0);
 
       meuGrafico = new Chart(ctx, {
@@ -485,9 +483,7 @@
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
-            legend: {
-              position: 'right',
-            },
+            legend: { position: 'right' },
             tooltip: {
               callbacks: {
                 label: function(context) {
