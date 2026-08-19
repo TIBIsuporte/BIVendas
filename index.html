@@ -331,16 +331,16 @@
         let bru = v.vlrBrutoTotalVenda;
         let desc = v.totalDescontosItens > 0 ? v.totalDescontosItens : v.descontoVenda;
 
-        // Verifica de forma abrangente se o tipo de venda contém "DEVOLUCAO" ou "DEVOLUÇÃO"
         const ehDevolucao = v.tipoVenda.includes("DEVOLUCAO") || v.tipoVenda.includes("DEVOLUÇÃO");
 
         if (v.tipoVenda === "TROCA") {
           bru -= v.descontoVenda;
         } else if (ehDevolucao) {
-          // Subtrai do líquido e do bruto tornando-os negativos para o abatimento correto
-          liq = -Math.abs(liq !== 0 ? liq : v.vlrLiquidoTotalItens);
-          bru = -Math.abs(bru !== 0 ? bru : v.vlrBrutoTotalVenda);
-          tDev += Math.abs(liq); // Soma para o card exclusivo de devoluções
+          // Como a devolução já vem negativa do banco, subtraímos o valor absoluto dela do total líquido e bruto
+          const valorDevolucao = Math.abs(liq !== 0 ? liq : v.vlrLiquidoTotalItens);
+          liq -= valorDevolucao;
+          bru -= Math.abs(bru !== 0 ? bru : v.vlrBrutoTotalVenda);
+          tDev += valorDevolucao; // Acumula no card de devoluções
         }
 
         tLiq += liq;
