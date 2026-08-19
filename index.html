@@ -263,7 +263,7 @@
 
       let totalLiquidoGeral = 0;
       let totalBrutoGeral = 0;
-      let totalOSCount = 0;
+      let totalOSValidas = 0; // Conta apenas as vendas efetivas (> 0)
       const vendasPorOS = {};
       const debugRows = [];
 
@@ -275,6 +275,19 @@
           liquidoEfetivoOS = vendaOS.vlrLiquidoTotalItens;
         }
 
+        // --- FILTRA OS COM VALOR LÍQUIDO ZERADO OU NEGATIVO ---
+        if (liquidoEfetivoOS <= 0) {
+          debugRows.push(`
+            <tr>
+              <td style="text-align: left;">${numOS}</td>
+              <td style="text-align: center;">${vendaOS.tipoVenda || 'VENDA'}</td>
+              <td colspan="4" style="text-align: center; color: #999; font-style: italic;">OS Ignorada (Valor Líquido Zero ou Negativo)</td>
+            </tr>
+          `);
+          return; // Pula para a próxima OS sem somar nos totais nem contar como venda válida
+        }
+        // -----------------------------------------------------
+
         let brutoEfetivoOS = vendaOS.vlrBrutoTotalVenda;
         if (vendaOS.tipoVenda === "TROCA") {
           brutoEfetivoOS -= vendaOS.descontoVenda;
@@ -282,7 +295,7 @@
 
         totalLiquidoGeral += liquidoEfetivoOS;
         totalBrutoGeral += brutoEfetivoOS;
-        totalOSCount++;
+        totalOSValidas++; // Incrementa apenas se passou no filtro
         vendasPorOS[numOS] = liquidoEfetivoOS;
 
         // Linha para a tabela de depuração
@@ -298,9 +311,10 @@
         `);
       });
 
-      const ticketMedio = totalOSCount > 0 ? totalLiquidoGeral / totalOSCount : 0;
+      // Ticket médio calculado com base apenas nas OS válidas
+      const ticketMedio = totalOSValidas > 0 ? totalLiquidoGeral / totalOSValidas : 0;
 
-      atualizarKPIs(totalBrutoGeral, totalLiquidoGeral, ticketMedio, totalOSCount);
+      atualizarKPIs(totalBrutoGeral, totalLiquidoGeral, ticketMedio, totalOSValidas);
       atualizarGraficoPorOS(vendasPorOS);
 
       // Renderiza a tabela de depuração preenchida
