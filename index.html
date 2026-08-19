@@ -47,7 +47,7 @@
     .card p { margin: 10px 0 0; font-size: 1.6em; font-weight: bold; color: #333; }
 
     /* Área do Gráfico */
-    .chart-container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; height: 400px; display: flex; justify-content: center; align-items: center; }
+    .chart-container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; height: 450px; display: flex; justify-content: center; align-items: center; position: relative; }
 
     /* Modal Lojas */
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
@@ -263,7 +263,7 @@
       } catch (error) {
         document.getElementById("resultado").innerHTML = "<p class='erro'>" + error.message + "</p>";
         atualizarKPIs(0, 0, 0, 0);
-        atualizarGraficoPorOS({});
+        atualizarGraficoPizza({});
       } finally {
         document.getElementById("loadingOverlay").style.display = "none";
       }
@@ -273,7 +273,7 @@
       if (!data || data.length === 0) {
         document.getElementById("resultado").innerHTML = "<p class='erro'>Nenhum resultado encontrado.</p>";
         atualizarKPIs(0, 0, 0, 0);
-        atualizarGraficoPorOS({});
+        atualizarGraficoPizza({});
         return;
       }
 
@@ -305,7 +305,7 @@
       });
 
       let tLiq = 0, tBru = 0, tOS = 0;
-      const vendasPorOS = {};
+      const vendasPorLoja = {};
 
       Object.keys(osMap).forEach(chave => {
         const v = osMap[chave];
@@ -316,11 +316,22 @@
         tLiq += liq;
         tBru += bru;
         if (bru > 0 || liq > 0) tOS++;
-        vendasPorOS[`L:${v.loja} OS:${v.numOS}`] = liq;
+
+        // Buscar nome da loja se disponível na lista carregada
+        let nomeLojaStr = `Loja ${v.loja}`;
+        const lojaEncontrada = lojasDisponiveis.find(l => String(l.id) === String(v.loja));
+        if (lojaEncontrada) {
+          nomeLojaStr = `[${lojaEncontrada.id}] ${lojaEncontrada.nome}`;
+        }
+
+        if (!vendasPorLoja[nomeLojaStr]) {
+          vendasPorLoja[nomeLojaStr] = 0;
+        }
+        vendasPorLoja[nomeLojaStr] += liq;
       });
 
       atualizarKPIs(tBru, tLiq, tOS > 0 ? tLiq / tOS : 0, tOS);
-      atualizarGraficoPorOS(vendasPorOS);
+      atualizarGraficoPizza(vendasPorLoja);
     }
 
     function atualizarKPIs(bruto, liquido, ticket, qtd) {
@@ -330,16 +341,45 @@
       document.getElementById("cardTotalPedidos").textContent = qtd.toLocaleString('pt-BR');
     }
 
-    function atualizarGraficoPorOS(vendas) {
+    function atualizarGraficoPizza(vendasPorLoja) {
       const ctx = document.getElementById('graficoVendasLoja').getContext('2d');
       if (meuGrafico) meuGrafico.destroy();
+
+      const labels = Object.keys(vendasPorLoja);
+      const dataValues = Object.values(vendasPorLoja);
+      
+      const totalGeral = dataValues.reduce((acc, val) => acc + val, 0);
+
       meuGrafico = new Chart(ctx, {
-        type: 'bar',
+        type: 'pie',
         data: {
-          labels: Object.keys(vendas),
-          datasets: [{ label: 'Valor Líquido (R$)', data: Object.values(vendas), backgroundColor: '#0078d7' }]
+          labels: labels,
+          datasets: [{
+            data: dataValues,
+            backgroundColor: [
+              '#0078d7', '#28a745', '#ffc107', '#dc3545', '#6f42c1', 
+              '#20c997', '#fd7e14', '#e83e8c', '#17a2b8', '#6c757d'
+            ]
+          }]
         },
-        options: { responsive: true, maintainAspectRatio: false }
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'right',
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const valor = context.raw || 0;
+                  const percentual = totalGeral > 0 ? ((valor / totalGeral) * 100).toFixed(2) : 0;
+                  return ` Valor Líquido: ${moedaParaTextoBR(valor)} (${percentual}%)`;
+                }
+              }
+            }
+          }
+        }
       });
     }
   </script>
