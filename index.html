@@ -47,6 +47,11 @@
     tr:nth-child(even) { background-color: #f9f9f9; }
     tr:hover { background-color: #f1f1f1; }
 
+    /* Estilo do Rodapé / Totalizadores */
+    tfoot tr { background-color: #e9ecef; font-weight: bold; position: sticky; bottom: 0; z-index: 9; }
+    tfoot td { border-top: 2px solid #0078d7; color: #000; font-size: 13px; }
+    .text-right { text-align: right; }
+
     /* Modal Lojas */
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
     .modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 500px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
@@ -99,11 +104,11 @@
 
   <div id="resultado"></div>
 
-  <!-- Grid com Renderização Dinâmica -->
+  <!-- Grid com Renderização Dinâmica e Rodapé de Totais -->
   <div class="grid-container">
     <h3>
       <span>Resultado da Consulta</span>
-      <span id="totalRegistros" style="font-size: 13px; color: #555;">0 registros encontados</span>
+      <span id="totalRegistros" style="font-size: 13px; color: #555;">0 registros encontrados</span>
     </h3>
     <div class="table-wrapper">
       <table id="tabelaDados">
@@ -117,6 +122,7 @@
             <td style="text-align: center; color: #777;">Preencha os filtros acima e clique em Consultar Dados.</td>
           </tr>
         </tbody>
+        <tfoot id="rodapeTabela"></tfoot>
       </table>
     </div>
   </div>
@@ -229,6 +235,19 @@
       return `${p[2]}/${p[1]}/${p[0]}`;
     }
 
+    // Auxiliar para converter texto/número em float numérico válido
+    function parseNumeroBR(valor) {
+      if (valor === null || valor === undefined || valor === "") return 0;
+      if (typeof valor === 'number') return valor;
+      const n = parseFloat(String(valor).replace(/\./g, '').replace(',', '.'));
+      return isNaN(n) ? 0 : n;
+    }
+
+    // Auxiliar para formatar números para moeda BR
+    function formatarMoeda(valor) {
+      return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
     async function consultar() {
       document.getElementById("loadingOverlay").style.display = "flex";
       document.getElementById("resultado").innerHTML = "";
@@ -261,10 +280,12 @@
     function renderizarGridPuro(dados) {
       const thead = document.getElementById("cabecalhoTabela");
       const tbody = document.getElementById("corpoTabela");
+      const tfoot = document.getElementById("rodapeTabela");
       const labelTotal = document.getElementById("totalRegistros");
 
       thead.innerHTML = "";
       tbody.innerHTML = "";
+      tfoot.innerHTML = "";
 
       if (!dados || dados.length === 0) {
         labelTotal.textContent = "0 registros encontrados";
@@ -275,10 +296,9 @@
 
       labelTotal.textContent = `${dados.length.toLocaleString('pt-BR')} registros encontrados`;
 
-      // Captura os nomes das chaves do primeiro objeto do array
       const colunas = Object.keys(dados[0]);
 
-      // Monta o Cabeçalho (TH) dinamicamente
+      // Monta o Cabeçalho (TH)
       let trHead = document.createElement("tr");
       colunas.forEach(coluna => {
         let th = document.createElement("th");
@@ -287,29 +307,63 @@
       });
       thead.appendChild(trHead);
 
-      // Monta as Linhas (TR) e Células (TD) dinamicamente
+      // Objeto para acumular totais de cada coluna
+      const totais = {};
+      const ehColunaNumerica = {};
+
+      colunas.forEach(col => {
+        totais[col] = 0;
+        ehColunaNumerica[col] = true; // Assume que é numérico até achar valor não numérico
+      });
+
+      // Monta as Linhas (TR) e calcula os totais
       dados.forEach(item => {
         let tr = document.createElement("tr");
         colunas.forEach(coluna => {
           let td = document.createElement("td");
-          let valor = item[coluna];
+          let valorBruto = item[coluna];
 
           // Trata valores nulos ou indefinições
-          if (valor === null || valor === undefined) {
-            valor = "-";
-          }
-
-          td.textContent = valor;
+          let valorExibicao = (valorBruto === null || valorBruto === undefined) ? "-" : valorBruto;
+          td.textContent = valorExibicao;
           tr.appendChild(td);
+
+          // Verifica se a coluna pode ser somada
+          if (valorBruto !== null && valorBruto !== undefined && valorBruto !== "") {
+            const num = parseNumeroBR(valorBruto);
+            if (!isNaN(num) && typeof valorBruto !== 'boolean') {
+              totais[coluna] += num;
+            } else {
+              ehColunaNumerica[coluna] = false;
+            }
+          }
         });
         tbody.appendChild(tr);
       });
+
+      // Monta o Rodapé de Totais (TFOOT)
+      let trFoot = document.createElement("tr");
+      colunas.forEach((coluna, index) => {
+        let td = document.createElement("td");
+
+        if (index === 0) {
+          td.textContent = "TOTALIZADORES";
+        } else if (ehColunaNumerica[coluna]) {
+          td.textContent = formatarMoeda(totais[coluna]);
+          td.classList.add("text-right");
+        } else {
+          td.textContent = "-";
+        }
+        trFoot.appendChild(td);
+      });
+      tfoot.appendChild(trFoot);
     }
 
     function limparTabela() {
       document.getElementById("totalRegistros").textContent = "0 registros encontrados";
       document.getElementById("cabecalhoTabela").innerHTML = "<tr><th>Status</th></tr>";
       document.getElementById("corpoTabela").innerHTML = "<tr><td style='text-align: center; color: red;'>Erro ao carregar dados.</td></tr>";
+      document.getElementById("rodapeTabela").innerHTML = "";
     }
   </script>
 </body>
