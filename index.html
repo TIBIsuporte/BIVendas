@@ -3,15 +3,31 @@
 <head>
   <meta charset="UTF-8">
   <title>Dashboard de Performance Comercial - BI Vendas</title>
+  <!-- Importando Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Importando Chart.js para os gráficos -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     body { font-family: "Segoe UI", Arial, sans-serif; margin: 20px; background: #f4f6f9; }
-    .header-titulo { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 20px; border-bottom: 10px solid #0078d7; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    
+    .header-titulo {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 10px solid #0078d7;
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
     h2 { color: #0078d7; margin: 0; }
     .titulo-aga { font-style: italic; color: #333; font-size: 1.2em; font-weight: bold; }
-    
+
+    /* Seção de Filtros no Topo */
     .filtros { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
     .linha { display: flex; gap: 20px; margin-top: 10px; }
     .linha label { flex: 1; font-weight: bold; font-size: 14px; color: #333; }
@@ -19,38 +35,40 @@
     button { padding: 10px 15px; background: #0078d7; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
     button:hover { background: #005a9e; }
     .btn-acao { margin-top: 15px; width: 100%; font-size: 15px; }
+    
+    .input-grupo { display: flex; gap: 10px; align-items: center; }
     .btn-modal { background: #6c757d; white-space: nowrap; }
     .btn-modal:hover { background: #5a6268; }
 
+    /* Cards de BI / Indicadores */
     .bi-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 20px; }
     .card { background: #fff; padding: 20px; border-radius: 8px; border-left: 5px solid #0078d7; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
     .card h4 { margin: 0; color: #666; font-size: 0.9em; text-transform: uppercase; }
     .card p { margin: 10px 0 0; font-size: 1.6em; font-weight: bold; color: #333; }
 
-    .chart-container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; height: 400px; }
-
-    /* Estilos Tabela de Depuração */
-    .debug-container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
-    .debug-container h3 { color: #0078d7; margin-top: 0; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
-    th, td { border: 1px solid #ddd; padding: 10px; text-align: right; }
-    th { background-color: #f8f9fa; color: #333; }
-    tr:nth-child(even) { background-color: #fcfcfc; }
+    /* Área do Gráfico */
+    .chart-container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; height: 400px; display: flex; justify-content: center; align-items: center; }
 
     /* Modal Lojas */
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
     .modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 500px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
-    .modal-header { font-weight: bold; font-size: 16px; margin-bottom: 12px; color: #0078d7; }
+    .modal-header { font-weight: bold; font-size: 16px; margin-bottom: 12px; color: #0078d7; display: flex; justify-content: space-between; align-items: center; }
+    
+    .modal-busca-container { margin-bottom: 10px; display: flex; flex-direction: column; gap: 5px; }
+    .modal-busca-container label { font-size: 12px; font-weight: bold; color: #555; }
+
     .modal-body { overflow-y: auto; max-height: 45vh; border: 1px solid #eee; padding: 10px; border-radius: 4px; margin-bottom: 15px; }
-    .modal-body label { display: flex; justify-content: space-between; align-items: center; padding: 6px 4px; cursor: pointer; border-bottom: 1px solid #f9f9f9; font-size: 13px; }
+    .modal-body label { display: flex; justify-content: space-between; align-items: center; padding: 6px 4px; cursor: pointer; font-weight: normal; border-bottom: 1px solid #f9f9f9; font-size: 13px; }
     .modal-body label:hover { background: #f1f1f1; }
     .modal-footer { display: flex; justify-content: flex-end; gap: 10px; }
     .btn-secundario { background: #6c757d; }
     .btn-secundario:hover { background: #5a6268; }
 
     .erro { color: red; font-weight: bold; margin-top: 15px; text-align: center; }
+    
     .loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.8); z-index: 2000; justify-content: center; align-items: center; flex-direction: column; gap: 15px; }
     .spinner { width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid #0078d7; border-radius: 50%; animation: spin 1s linear infinite; }
+    .loading-text { font-weight: bold; color: #0078d7; font-size: 16px; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
@@ -61,54 +79,73 @@
     <span class="titulo-aga">by AGA</span>
   </div>
 
+  <!-- 1. Filtros no Topo -->
   <div class="filtros">
     <div class="linha">
       <label>Lojas (IDs separados por vírgula):
-        <div style="display: flex; gap: 10px; margin-top: 5px; align-items: center;">
+        <div class="input-grupo" style="margin-top: 5px;">
           <input type="text" id="lojas" placeholder="Ex: 1,2 ou selecione no botão">
           <button type="button" class="btn-modal" onclick="abrirModalLojas()">Selecionar Lojas</button>
         </div>
       </label>
     </div>
     <div class="linha">
-      <label>Data Inicial: <input type="date" id="dataInicial"></label>
-      <label>Data Final: <input type="date" id="dataFinal"></label>
+      <label>Data Inicial:
+        <input type="date" id="dataInicial">
+      </label>
+      <label>Data Final:
+        <input type="date" id="dataFinal">
+      </label>
     </div>
     <button class="btn-acao" onclick="consultar()">Consultar Dashboard</button>
   </div>
 
   <div id="resultado"></div>
 
+  <!-- 2. Cards de Indicadores (KPIs) -->
   <div class="bi-cards">
-    <div class="card"><h4>Total Vendas (Bruto)</h4><p id="cardTotalBruto">R$ 0,00</p></div>
-    <div class="card"><h4>Total Vendas (Líquido)</h4><p id="cardTotalLiquido">R$ 0,00</p></div>
-    <div class="card"><h4>Ticket Médio</h4><p id="cardTicketMedio">R$ 0,00</p></div>
-    <div class="card"><h4>Total de Ordens de Serviço (OS)</h4><p id="cardTotalPedidos">0</p></div>
+    <div class="card">
+      <h4>Total Vendas (Bruto)</h4>
+      <p id="cardTotalBruto">R$ 0,00</p>
+    </div>
+    <div class="card">
+      <h4>Total Vendas (Líquido)</h4>
+      <p id="cardTotalLiquido">R$ 0,00</p>
+    </div>
+    <div class="card">
+      <h4>Ticket Médio</h4>
+      <p id="cardTicketMedio">R$ 0,00</p>
+    </div>
+    <div class="card">
+      <h4>Total de Ordens de Serviço (OS)</h4>
+      <p id="cardTotalPedidos">0</p>
+    </div>
   </div>
 
+  <!-- 3. Container do Gráfico -->
   <div class="chart-container">
     <canvas id="graficoVendasLoja"></canvas>
   </div>
 
-  <!-- Tabela de Depuração -->
-  <div class="debug-container">
-    <h3>Depuração: Detalhamento por Ordem de Serviço (OS)</h3>
-    <div id="tabelaDepuracao">
-      <p style="color: #666; font-size: 13px; text-align: center; margin: 10px 0;">Faça uma consulta para visualizar os dados de depuração.</p>
-    </div>
-  </div>
-
   <div id="loadingOverlay" class="loading-overlay">
     <div class="spinner"></div>
-    <div style="font-weight: bold; color: #0078d7;">Processando indicadores de BI...</div>
+    <div class="loading-text">Processando indicadores de BI, por favor aguarde...</div>
   </div>
 
   <!-- Modal Lojas -->
   <div id="modalLojas" class="modal-overlay">
     <div class="modal-content">
-      <div class="modal-header">Selecionar Lojas</div>
+      <div class="modal-header">
+        <span>Selecionar Lojas</span>
+      </div>
+      <div class="modal-busca-container">
+        <label>Filtrar por Código, Nome da Loja ou Gerente:</label>
+        <input type="text" id="inputFiltroGerenteModal" placeholder="Digite para filtrar..." onkeyup="filtrarLojasNoModal()">
+      </div>
       <div style="margin-bottom: 8px;">
-        <input type="text" id="inputFiltroGerenteModal" placeholder="Filtrar lojas..." onkeyup="filtrarLojasNoModal()">
+        <label style="font-size: 13px; cursor: pointer; font-weight: bold; display: flex; justify-content: flex-start; gap: 8px;">
+          <input type="checkbox" id="selecionarTodasLojas" onclick="toggleSelecionarTodasLojas(this)" style="width: auto;"> Selecionar / Desmarcar Lojas Visíveis
+        </label>
       </div>
       <div class="modal-body" id="listaLojasModal"></div>
       <div class="modal-footer">
@@ -128,11 +165,15 @@
 
     window.onload = async () => {
       try {
-        const { data, error } = await supabaseClient.from('lojas').select('id, nome, gerente').order('id', { ascending: true });
+        const { data, error } = await supabaseClient
+          .from('lojas')
+          .select('id, nome, gerente')
+          .order('id', { ascending: true });
+        
         if (error) throw error;
         lojasDisponiveis = data || [];
       } catch (err) {
-        console.error("Erro ao carregar lojas:", err.message);
+        console.error("Erro ao carregar lojas do Supabase:", err.message);
       }
     };
 
@@ -146,33 +187,60 @@
       const container = document.getElementById("listaLojasModal");
       container.innerHTML = "";
       const idsAtuais = document.getElementById("lojas").value.split(",").map(s => s.trim());
+      const listaOrdenada = [...lista].sort((a, b) => Number(a.id) - Number(b.id));
 
-      lista.forEach(loja => {
+      listaOrdenada.forEach(loja => {
         const checked = idsAtuais.includes(String(loja.id)) ? "checked" : "";
         container.innerHTML += `
           <label class="item-loja-modal" data-texto="[${loja.id}] ${loja.nome} ${loja.gerente || ''}">
             <div>
-              <input type="checkbox" value="${loja.id}" ${checked} style="width: auto; margin-right: 8px;">
+              <input type="checkbox" value="${loja.id}" ${checked} style="width: auto; margin-right: 8px;"> 
               <strong>[${loja.id}]</strong> ${loja.nome}
             </div>
-            <span style="color: #666; font-size: 11px;">${loja.gerente || ''}</span>
+            <span style="color: #666; font-size: 11px;">Gerente: ${loja.gerente || '-'}</span>
           </label>
         `;
       });
     }
 
     function filtrarLojasNoModal() {
-      const termo = document.getElementById("inputFiltroGerenteModal").value.toUpperCase();
-      document.querySelectorAll("#listaLojasModal .item-loja-modal").forEach(label => {
+      const termo = document.getElementById("inputFiltroGerenteModal").value.trim().toUpperCase();
+      const labels = document.querySelectorAll("#listaLojasModal .item-loja-modal");
+
+      labels.forEach(label => {
         const texto = label.getAttribute("data-texto").toUpperCase();
-        label.style.display = texto.includes(termo) ? "flex" : "none";
+        if (texto.includes(termo) || termo === "") {
+          label.style.display = "flex";
+        } else {
+          label.style.display = "none";
+        }
       });
     }
 
-    function fecharModalLojas() { document.getElementById("modalLojas").style.display = "none"; }
+    function fecharModalLojas() {
+      document.getElementById("modalLojas").style.display = "none";
+    }
+
+    function toggleSelecionarTodasLojas(master) {
+      const labels = document.querySelectorAll("#listaLojasModal .item-loja-modal");
+      labels.forEach(label => {
+        if (label.style.display !== "none") {
+          const cb = label.querySelector("input[type='checkbox']");
+          if (cb) cb.checked = master.checked;
+        }
+      });
+    }
 
     function confirmarSelecaoLojas() {
-      const idsSelecionados = Array.from(document.querySelectorAll("#listaLojasModal input[type='checkbox']:checked")).map(cb => cb.value);
+      const idsSelecionados = [];
+      const checkboxes = document.querySelectorAll("#listaLojasModal input[type='checkbox']");
+      
+      checkboxes.forEach(cb => {
+        if (cb.checked) {
+          idsSelecionados.push(cb.value);
+        }
+      });
+
       document.getElementById("lojas").value = idsSelecionados.join(",");
       fecharModalLojas();
     }
@@ -218,7 +286,6 @@
         document.getElementById("resultado").innerHTML = "<p class='erro'>" + error.message + "</p>";
         atualizarKPIs(0, 0, 0, 0);
         atualizarGraficoPorOS({});
-        document.getElementById("tabelaDepuracao").innerHTML = "<p style='color:red; text-align:center;'>Erro ao carregar dados de depuração.</p>";
       } finally {
         document.getElementById("loadingOverlay").style.display = "none";
       }
@@ -229,11 +296,12 @@
         document.getElementById("resultado").innerHTML = "<p class='erro'>Nenhum resultado encontrado para os filtros informados.</p>";
         atualizarKPIs(0, 0, 0, 0);
         atualizarGraficoPorOS({});
-        document.getElementById("tabelaDepuracao").innerHTML = "<p style='text-align:center; color:#666;'>Nenhum registro para depurar.</p>";
         return;
       }
 
+      // 1. Agrupar os itens por Ordem de Serviço (OS)
       const osMap = {};
+
       data.forEach(item => {
         const numOS = item.OS || item.CODIGODAVENDA;
         if (!numOS) return;
@@ -244,29 +312,38 @@
         const tipoVenda = String(item.TIPOVENDA || "").trim().toUpperCase();
         const descontoVendaItem = formatarMoedaBR(item.DESCONTOVENDA);
 
+        // Valor Bruto padrão dos itens
+        let brutoEfetivoItem = vlrBrutoProdutoItem;
+
         if (!osMap[numOS]) {
           osMap[numOS] = {
+            loja: item.LOJA || "",
+            data: item.DATA || "",
             tipoVenda: tipoVenda,
             vlrLiquidoVenda: vlrLiquidoVendaHeader,
-            vlrBrutoTotalVenda: vlrBrutoProdutoItem,
+            descontoVenda: descontoVendaItem,
+            vlrBrutoTotalVenda: brutoEfetivoItem,
             vlrLiquidoTotalItens: vlrLiquidoProdutoItem,
-            descontoVenda: descontoVendaItem
+            itens: []
           };
         } else {
-          osMap[numOS].vlrBrutoTotalVenda += vlrBrutoProdutoItem;
+          osMap[numOS].vlrBrutoTotalVenda += brutoEfetivoItem;
           osMap[numOS].vlrLiquidoTotalItens += vlrLiquidoProdutoItem;
+          
           if (descontoVendaItem > osMap[numOS].descontoVenda) {
             osMap[numOS].descontoVenda = descontoVendaItem;
           }
         }
+
+        osMap[numOS].itens.push(item);
       });
 
       let totalLiquidoGeral = 0;
       let totalBrutoGeral = 0;
-      let totalOSValidas = 0; // Conta apenas as vendas efetivas (> 0)
+      let totalOSCount = 0;
       const vendasPorOS = {};
-      const debugRows = [];
 
+      // 2. Calcular os totais somando cada OS de forma única e aplicando a regra de TROCA
       Object.keys(osMap).forEach(numOS => {
         const vendaOS = osMap[numOS];
         
@@ -275,66 +352,31 @@
           liquidoEfetivoOS = vendaOS.vlrLiquidoTotalItens;
         }
 
-        // --- FILTRA OS COM VALOR LÍQUIDO ZERADO OU NEGATIVO ---
-        if (liquidoEfetivoOS <= 0) {
-          debugRows.push(`
-            <tr>
-              <td style="text-align: left;">${numOS}</td>
-              <td style="text-align: center;">${vendaOS.tipoVenda || 'VENDA'}</td>
-              <td colspan="4" style="text-align: center; color: #999; font-style: italic;">OS Ignorada (Valor Líquido Zero ou Negativo)</td>
-            </tr>
-          `);
-          return; // Pula para a próxima OS sem somar nos totais nem contar como venda válida
-        }
-        // -----------------------------------------------------
-
         let brutoEfetivoOS = vendaOS.vlrBrutoTotalVenda;
+
+        // REGRA: Se TIPOVENDA = "TROCA", subtrair o DESCONTOVENDA do Total Vendas (Bruto)
         if (vendaOS.tipoVenda === "TROCA") {
           brutoEfetivoOS -= vendaOS.descontoVenda;
         }
 
         totalLiquidoGeral += liquidoEfetivoOS;
         totalBrutoGeral += brutoEfetivoOS;
-        totalOSValidas++; // Incrementa apenas se passou no filtro
+        totalOSCount++;
+        
         vendasPorOS[numOS] = liquidoEfetivoOS;
-
-        // Linha para a tabela de depuração
-        debugRows.push(`
-          <tr>
-            <td style="text-align: left;">${numOS}</td>
-            <td style="text-align: center;">${vendaOS.tipoVenda || 'VENDA'}</td>
-            <td>${moedaParaTextoBR(vendaOS.vlrBrutoTotalVenda)}</td>
-            <td>${moedaParaTextoBR(vendaOS.descontoVenda)}</td>
-            <td><strong>${moedaParaTextoBR(brutoEfetivoOS)}</strong></td>
-            <td><strong>${moedaParaTextoBR(liquidoEfetivoOS)}</strong></td>
-          </tr>
-        `);
       });
 
-      // Ticket médio calculado com base apenas nas OS válidas
-      const ticketMedio = totalOSValidas > 0 ? totalLiquidoGeral / totalOSValidas : 0;
+      if (totalOSCount === 0 && totalLiquidoGeral === 0) {
+        document.getElementById("resultado").innerHTML = "<p class='erro'>Nenhum registro correspondente após o processamento.</p>";
+        atualizarKPIs(0, 0, 0, 0);
+        atualizarGraficoPorOS({});
+        return;
+      }
 
-      atualizarKPIs(totalBrutoGeral, totalLiquidoGeral, ticketMedio, totalOSValidas);
+      const ticketMedio = totalOSCount > 0 ? totalLiquidoGeral / totalOSCount : 0;
+
+      atualizarKPIs(totalBrutoGeral, totalLiquidoGeral, ticketMedio, totalOSCount);
       atualizarGraficoPorOS(vendasPorOS);
-
-      // Renderiza a tabela de depuração preenchida
-      document.getElementById("tabelaDepuracao").innerHTML = `
-        <table>
-          <thead>
-            <tr>
-              <th style="text-align: left;">OS</th>
-              <th style="text-align: center;">Tipo</th>
-              <th>Bruto Inicial</th>
-              <th>Desconto</th>
-              <th>Bruto Efetivo</th>
-              <th>Líquido Efetivo</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${debugRows.join('')}
-          </tbody>
-        </table>
-      `;
     }
 
     function atualizarKPIs(bruto, liquido, ticket, quantidade) {
@@ -346,10 +388,13 @@
 
     function atualizarGraficoPorOS(vendasPorOS) {
       const ctx = document.getElementById('graficoVendasLoja').getContext('2d');
+      
       const labels = Object.keys(vendasPorOS).map(os => 'OS ' + os);
       const valores = Object.values(vendasPorOS);
 
-      if (meuGrafico) meuGrafico.destroy();
+      if (meuGrafico) {
+        meuGrafico.destroy();
+      }
 
       meuGrafico = new Chart(ctx, {
         type: 'bar',
@@ -367,11 +412,22 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
+          plugins: {
+            legend: { display: false },
+            title: {
+              display: true,
+              text: 'Desempenho de Vendas Líquidas por Ordem de Serviço (OS)',
+              font: { size: 16 }
+            }
+          },
           scales: {
             y: {
               beginAtZero: true,
-              ticks: { callback: function(value) { return 'R$ ' + value.toLocaleString('pt-BR'); } }
+              ticks: {
+                callback: function(value) {
+                  return 'R$ ' + value.toLocaleString('pt-BR');
+                }
+              }
             }
           }
         }
