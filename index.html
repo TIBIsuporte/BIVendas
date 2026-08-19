@@ -331,26 +331,24 @@
         let bru = v.vlrBrutoTotalVenda;
         let desc = v.totalDescontosItens > 0 ? v.totalDescontosItens : v.descontoVenda;
 
-   
-      if (tipoVendaNorm === "TROCA") {
-        bru -= v.descontoVenda;
-      } 
-      
-      if (tipoVendaNorm === "DEVOLUCAO") {
-        // Como o banco já envia os valores negativos (ex: -317.25), 
-        // nós apenas garantimos o valor positivo para o card de Devoluções:
-        const valorDevolucaoCard = Math.abs(liq !== 0 ? liq : v.vlrLiquidoTotalItens);
-        tDev += valorDevolucaoCard; 
-        
-        // Os valores de 'liq' e 'bru' já entram naturalmente negativos 
-        // e vão abater o total geral de forma limpa e matemática por conta própria!
-      }
+        // CRIANDO A VARIÁVEL CORRETAMENTE PARA EVITAR O ERRO
+        const tipoVendaNorm = v.tipoVenda;
 
-      tLiq += liq;
-      tBru += bru;
-      tDesc += Math.abs(desc);
+        if (tipoVendaNorm === "TROCA") {
+          bru -= v.descontoVenda;
+        } 
         
-      if (bru !== 0 || liq !== 0) tOS++;
+        if (tipoVendaNorm === "DEVOLUCAO") {
+          const valorDevolucaoCard = Math.abs(liq !== 0 ? liq : v.vlrLiquidoTotalItens);
+          tDev += valorDevolucaoCard; 
+        }
+
+        tLiq += liq;
+        tBru += bru;
+        tDesc += Math.abs(desc);
+        
+        if (bru !== 0 || liq !== 0) tOS++;
+
         // Buscar nome da loja
         let nomeLojaStr = `Loja ${v.loja}`;
         const lojaEncontrada = lojasDisponiveis.find(l => String(l.id) === String(v.loja));
