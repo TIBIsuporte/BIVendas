@@ -306,26 +306,42 @@
         const numOS = item.OS || item.CODIGODAVENDA;
         if (!numOS) return;
 
-        const vlrBrutoItem = formatarMoedaBR(item.VALORBRUTOPRODUTO);
-        const vlrDesc = formatarMoedaBR(item.DESCONTOVENDA);
-        const vlrLiquidoItem = formatarMoedaBR(item.LIQUIDOPRODUTO);
-        const vlrLiquidoHeader = formatarMoedaBR(item.VLRLIQUIDOVENDA);
+        const vlrBrutoProdutoItem = formatarMoedaBR(item.VALORBRUTOPRODUTO);
+        const vlrLiquidoProdutoItem = formatarMoedaBR(item.LIQUIDOPRODUTO);
+        const vlrLiquidoVendaHeader = formatarMoedaBR(item.VLRLIQUIDOVENDA);
         const tipoVenda = String(item.TIPOVENDA || "").trim().toUpperCase();
 
-        // O bruto efetivo desconta o valor de troca gravado em DESCONTOVENDA para evitar inflar o faturamento bruto
-        let brutoEfetivoItem = vlrBrutoItem - vlrDesc;
+        // Se o líquido do produto for negativo ou o tipo for TROCA com líquido negativo, 
+        // o valor bruto correspondente também deve entrar como negativo (ou redutor) para bater com o sistema.
+        let brutoEfetivoItem = vlrBrutoProdutoItem;
+        if (vlrLiquidoProdutoItem < 0 || tipoVenda === "TROCA") {
+          // Se o bruto estiver positivo mas a troca gerou saldo negativo no líquido, ajustamos o sinal do bruto proporcionalmente
+          if (brutoEfetivoItem > 0 && vlrLiquidoProdutoItem < 0) {
+            brutoEfetivoItem = -Math.abs(brutoEfetivoItem);
+          }
+        }
 
         if (!osMap[numOS]) {
           osMap[numOS] = {
-            vlrLiquidoVenda: vlrLiquidoHeader,
+            loja: item.LOJA || "",
+            data: item.DATA || "",
+            tipoVenda: tipoVenda,
+            vlrLiquidoVenda: vlrLiquidoVendaHeader,
+            descontoVenda: formatarMoedaBR(item.DESCONTOVENDA),
             vlrBrutoTotalVenda: brutoEfetivoItem,
-            vlrLiquidoTotalItens: vlrLiquidoItem,
+            vlrLiquidoTotalItens: vlrLiquidoProdutoItem,
             itens: []
           };
         } else {
           osMap[numOS].vlrBrutoTotalVenda += brutoEfetivoItem;
-          osMap[numOS].vlrLiquidoTotalItens += vlrLiquidoItem;
+          osMap[numOS].vlrLiquidoTotalItens += vlrLiquidoProdutoItem;
+          
+          const descAtual = formatarMoedaBR(item.DESCONTOVENDA);
+          if (descAtual > osMap[numOS].descontoVenda) {
+            osMap[numOS].descontoVenda = descAtual;
+          }
         }
+
         osMap[numOS].itens.push(item);
       });
 
@@ -334,7 +350,7 @@
       let totalOSCount = 0;
       const vendasPorOS = {};
 
-      // 2. Consolidar os totais gerais da Loja/Período
+      // 2. Calcular os totais somando cada OS de forma única
       Object.keys(osMap).forEach(numOS => {
         const vendaOS = osMap[numOS];
         
