@@ -26,10 +26,10 @@ app.post("/consulta", async (req, res) => {
     LOJAS: req.body.LOJAS || ""
   };
 
-  console.log("Body enviado para Venda por datas:", body);
+  console.log("Body enviado para RetornaVendasPendentesCompletas:", body);
 
   try {
-    const response = await fetch("https://api.savwinweb.com.br/api/APIRelatoriosCR/ProdutosPorOS", {
+    const response = await fetch("https://api.savwinweb.com.br/api/APIDados/RetornaVendasPendentesCompletas", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
