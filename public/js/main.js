@@ -44,7 +44,6 @@ async function consultar() {
   };
 
   try {
-    // Chamada segura para a própria API interna do servidor (sem expor tokens externos)
     const response = await fetch("/consulta", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -125,11 +124,11 @@ function processarDadosBI(dados) {
     Object.keys(ordensServico).forEach(os => {
       const venda = ordensServico[os];
       
-      const vBruto = venda.VALORBRUTO;
-      const vDesconto = venda.DESCONTOVALORPRODUTO;
+      const vBruto = Math.abs(venda.VALORBRUTO);
+      const vDesconto = Math.abs(venda.DESCONTOVALORPRODUTO);
       const vLiquido = venda.VALORLIQUIDOTOTALVENDA;
 
-      // Tratamento corrigido: se for devolução, acumula no total de devolução e pula os totais de venda normal
+      // Se for devolução, contabiliza apenas no card de devolução e descarta dos totais de vendas normais
       if (venda.TIPOVENDA === "DEVOLUCAO" || venda.EHDEVOLUCAO === "S" || venda.EHDEVOLUCAO === "SIM" || vLiquido < 0) {
         totalDevolucaoGeral += Math.abs(vLiquido);
         return; 
