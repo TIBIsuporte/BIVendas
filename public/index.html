@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Auditoria: Relatório de OS Pendentes</title>
+  <title>Auditoria: BI</title>
   
   <!-- Importando Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -13,7 +13,7 @@
 <body>
 
   <div class="header-titulo">
-    <h2>Auditoria: Relatório de OS Pendentes</h2>
+    <h2>Auditoria: BI</h2>
     <span class="titulo-aga">by AGA</span>
   </div>
 
@@ -104,21 +104,15 @@
     const SUPABASE_KEY = 'sb_publishable_biWjIRo9x6maeZXcoKX6Lw_l-fjV0wP';
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // Lista exclusiva de colunas de valores que serão totalizadas
+    // Lista atualizada com base nos campos numéricos/valores retornados pela API ProdutosPorOS
     const COLUNAS_VALORES_TOTALIZAR = [
+      'QUANTIDADETOTAL',
       'VALORBRUTO',
-      'DESCONTOPERCENTUAL',
-      'DESCONTOVALOR',
-      'DESCONTOCAIXA',
-      'VALORLIQUIDO',
-      'VALORJARECEBIDO',
-      'VALORDEDEVOLUCAO',
-      'VALORDECREDITOGERADO',
-      'VALORDECREDITOUSADO'
+      'DESCONTOVALORPRODUTO',
+      'VALORLIQUIDOTOTALVENDA'
     ];
 
     window.onload = async () => {
-      // Chama a função que está no arquivo lojas-modal.js
       await carregarLojasSupabase(supabaseClient);
     };
 
@@ -193,8 +187,15 @@
       if (lojasDigitadas) {
         const idsFiltro = lojasDigitadas.split(",").map(id => id.trim());
         dadosFiltrados = dados.filter(item => {
-          const codLoja = String(item.CODIGOLOJA ?? item.LOJA ?? item.loja ?? item.IdLoja ?? "").trim();
-          return idsFiltro.includes(codLoja);
+          const textoLojaCompleto = String(item.LOJANOME ?? item.CODIGOLOJA ?? item.LOJA ?? item.loja ?? item.IdLoja ?? "").trim();
+          
+          const matchCodigo = textoLojaCompleto.match(/^0*(\d+)/);
+          const codigoExtraido = matchCodigo ? matchCodigo[1] : textoLojaCompleto;
+          const codigoSemZeroEsquerda = matchCodigo ? String(parseInt(matchCodigo[1], 10)) : codigoExtraido;
+
+          return idsFiltro.includes(codigoExtraido) || 
+                 idsFiltro.includes(codigoSemZeroEsquerda) || 
+                 idsFiltro.some(id => textoLojaCompleto.toLowerCase().includes(id.toLowerCase()));
         });
       }
 
@@ -209,7 +210,6 @@
 
       const colunas = Object.keys(dadosFiltrados[0]);
 
-      // Monta Cabeçalho
       let trHead = document.createElement("tr");
       colunas.forEach(coluna => {
         let th = document.createElement("th");
@@ -218,11 +218,9 @@
       });
       thead.appendChild(trHead);
 
-      // Objeto acumulador de totais
       const totais = {};
       COLUNAS_VALORES_TOTALIZAR.forEach(col => totais[col] = 0);
 
-      // Preenche Células e calcula soma das colunas mapeadas
       dadosFiltrados.forEach(item => {
         let tr = document.createElement("tr");
         colunas.forEach(coluna => {
@@ -239,7 +237,6 @@
         tbody.appendChild(tr);
       });
 
-      // Monta o Rodapé (TFOOT)
       let trFoot = document.createElement("tr");
       colunas.forEach((coluna, index) => {
         let td = document.createElement("td");
@@ -248,8 +245,8 @@
         if (index === 0) {
           td.textContent = "TOTAL";
         } else if (COLUNAS_VALORES_TOTALIZAR.includes(colunaUpper)) {
-          if (colunaUpper === 'DESCONTOPERCENTUAL') {
-            td.textContent = totais[colunaUpper].toFixed(2) + " %";
+          if (colunaUpper === 'QUANTIDADETOTAL') {
+            td.textContent = totais[colunaUpper].toLocaleString('pt-BR', { minimumFractionDigits: 2 });
           } else {
             td.textContent = formatarMoedaBR(totais[colunaUpper]);
           }
