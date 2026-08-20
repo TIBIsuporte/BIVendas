@@ -1,283 +1,54 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <title>Consulta de Lojas - BI Vendas</title>
-  <!-- Importando Supabase JS -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+const express = require("express");
+const cors = require("cors");
+const { createClient } = require("@supabase/supabase-js");
 
-  <style>
-    body { font-family: "Segoe UI", Arial, sans-serif; margin: 20px; background: #f4f6f9; }
-    
-    .header-titulo {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-      padding: 20px;
-      border-bottom: 10px solid #0078d7;
-      background: #fff;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    
-    h2 { color: #0078d7; margin: 0; }
-    .titulo-aga { font-style: italic; color: #333; font-size: 1.2em; font-weight: bold; }
+const app = express();
+app.use(express.json({ limit: "10mb" }));
+app.use(cors());
 
-    /* Seção de Filtros */
-    .filtros { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
-    .linha { display: flex; gap: 20px; margin-top: 10px; }
-    .linha label { flex: 1; font-weight: bold; font-size: 14px; color: #333; }
-    input { padding: 9px; width: 100%; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; margin-top: 5px; }
-    button { padding: 10px 15px; background: #0078d7; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-    button:hover { background: #005a9e; }
-    .btn-acao { margin-top: 15px; width: 100%; font-size: 15px; }
-    
-    .input-grupo { display: flex; gap: 10px; align-items: center; }
-    .btn-modal { background: #6c757d; white-space: nowrap; }
-    .btn-modal:hover { background: #5a6268; }
+app.use(express.static(__dirname));
 
-    /* Grid Principal de Dados */
-    .grid-container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-    .grid-container h3 { margin-top: 0; color: #0078d7; font-size: 1.1em; display: flex; justify-content: space-between; align-items: center; }
-    .table-wrapper { max-height: 65vh; overflow: auto; border: 1px solid #ddd; border-radius: 4px; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
-    th, td { padding: 8px 12px; border-bottom: 1px solid #eee; border-right: 1px solid #eee; white-space: nowrap; }
-    th { background: #0078d7; color: #fff; position: sticky; top: 0; z-index: 10; text-transform: uppercase; font-size: 12px; }
-    tr:nth-child(even) { background-color: #f9f9f9; }
-    tr:hover { background-color: #f1f1f1; }
+const SUPABASE_URL = "https://cwmofpwuihrnifsvqhik.supabase.co";
+const SUPABASE_KEY = "sb_publishable_biWjIRo9x6maeZXcoKX6Lw_l-fjV0wP";
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    /* Modal Lojas */
-    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
-    .modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 500px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
-    .modal-header { font-weight: bold; font-size: 16px; margin-bottom: 12px; color: #0078d7; display: flex; justify-content: space-between; align-items: center; }
-    
-    .modal-busca-container { margin-bottom: 10px; display: flex; flex-direction: column; gap: 5px; }
-    .modal-busca-container label { font-size: 12px; font-weight: bold; color: #555; }
+app.post("/consulta", async (req, res) => {
+  const body = {
+    DATAINICIAL: req.body.DATAINICIAL ?? "",
+    DATAFINAL: req.body.DATAFINAL ?? "",
+    LOJAS: req.body.LOJAS ?? ""
+  };
 
-    .modal-body { overflow-y: auto; max-height: 45vh; border: 1px solid #eee; padding: 10px; border-radius: 4px; margin-bottom: 15px; }
-    .modal-body label { display: flex; justify-content: space-between; align-items: center; padding: 6px 4px; cursor: pointer; font-weight: normal; border-bottom: 1px solid #f9f9f9; font-size: 13px; }
-    .modal-body label:hover { background: #f1f1f1; }
-    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; }
-    .btn-secundario { background: #6c757d; }
-    .btn-secundario:hover { background: #5a6268; }
+  console.log("Body enviado para ProdutosPorOSGrid:", body);
 
-    .erro { color: red; font-weight: bold; margin-top: 15px; text-align: center; }
-    
-    .loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.8); z-index: 2000; justify-content: center; align-items: center; flex-direction: column; gap: 15px; }
-    .spinner { width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid #0078d7; border-radius: 50%; animation: spin 1s linear infinite; }
-    .loading-text { font-weight: bold; color: #0078d7; font-size: 16px; }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-  </style>
-</head>
-<body>
+  try {
+    // const response = await fetch("https://api.savwinweb.com.br/api/APIRelatoriosCR/ProdutosPorOSGrid", {
+    const response = await fetch("https://api.savwinweb.com.br/api/APIDados/RetornaVendasPendentesCompletas{
+      
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer 4AE83C98E8315579579F297C8F8BDE2C6ACF269E57D85DD37EF2647DCA77733",
+        "Identificador": "09983-0000"
+      },
+      body: JSON.stringify(body)
+    });
 
-  <div class="header-titulo">
-    <h2>Consulta de Lojas - BI Vendas</h2>
-    <span class="titulo-aga">by AGA</span>
-  </div>
+    console.log("Status da resposta da API:", response.status);
 
-  <div class="filtros">
-    <div class="linha">
-      <label>Lojas (IDs separados por vírgula):
-        <div class="input-grupo" style="margin-top: 5px;">
-          <input type="text" id="lojas" placeholder="Ex: 1,2 ou selecione no botão">
-          <button type="button" class="btn-modal" onclick="abrirModalLojas()">Selecionar Lojas</button>
-        </div>
-      </label>
-    </div>
-    <button class="btn-acao" onclick="consultar()">Consultar Dados</button>
-  </div>
-
-  <div id="resultado"></div>
-
-  <!-- Grid com Renderização Dinâmica -->
-  <div class="grid-container">
-    <h3>
-      <span>Resultado da Consulta</span>
-      <span id="totalRegistros" style="font-size: 13px; color: #555;">0 registros encontrados</span>
-    </h3>
-    <div class="table-wrapper">
-      <table id="tabelaDados">
-        <thead id="cabecalhoTabela">
-          <tr><th>Aguardando Consulta</th></tr>
-        </thead>
-        <tbody id="corpoTabela">
-          <tr><td style="text-align: center; color: #777;">Selecione as lojas e clique em Consultar Dados.</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <div id="loadingOverlay" class="loading-overlay">
-    <div class="spinner"></div>
-    <div class="loading-text">Buscando dados na API, aguarde...</div>
-  </div>
-
-  <!-- Modal Lojas -->
-  <div id="modalLojas" class="modal-overlay">
-    <div class="modal-content">
-      <div class="modal-header">
-        <span>Selecionar Lojas</span>
-      </div>
-      <div class="modal-busca-container">
-        <label>Filtrar por Código, Nome da Loja ou Gerente:</label>
-        <input type="text" id="inputFiltroGerenteModal" placeholder="Digite para filtrar..." onkeyup="filtrarLojasNoModal()">
-      </div>
-      <div style="margin-bottom: 8px;">
-        <label style="font-size: 13px; cursor: pointer; font-weight: bold; display: flex; justify-content: flex-start; gap: 8px;">
-          <input type="checkbox" id="selecionarTodasLojas" onclick="toggleSelecionarTodasLojas(this)" style="width: auto;"> Selecionar / Desmarcar Lojas Visíveis
-        </label>
-      </div>
-      <div class="modal-body" id="listaLojasModal"></div>
-      <div class="modal-footer">
-        <button type="button" class="btn-secundario" onclick="fecharModalLojas()">Cancelar</button>
-        <button type="button" onclick="confirmarSelecaoLojas()">Confirmar</button>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    const SUPABASE_URL = 'https://cwmofpwuihrnifsvqhik.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_biWjIRo9x6maeZXcoKX6Lw_l-fjV0wP';
-    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    let lojasDisponiveis = [];
-
-    window.onload = async () => {
-      try {
-        const { data, error } = await supabaseClient
-          .from('lojas')
-          .select('id, nome, gerente')
-          .order('id', { ascending: true });
-        
-        if (error) throw error;
-        lojasDisponiveis = data || [];
-      } catch (err) {
-        console.error("Erro ao carregar lojas do Supabase:", err.message);
-      }
-    };
-
-    function abrirModalLojas() {
-      document.getElementById("inputFiltroGerenteModal").value = "";
-      renderizarListaLojasModal(lojasDisponiveis);
-      document.getElementById("modalLojas").style.display = "flex";
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Erro retornado pela API Savwin:", errorText);
+      return res.status(response.status).json({ erro: "Erro na API externa", detalhe: errorText });
     }
 
-    function renderizarListaLojasModal(lista) {
-      const container = document.getElementById("listaLojasModal");
-      container.innerHTML = "";
-      const idsAtuais = document.getElementById("lojas").value.split(",").map(s => s.trim());
-      const listaOrdenada = [...lista].sort((a, b) => Number(a.id) - Number(b.id));
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    console.error("Erro de conexão ou timeout na chamada da API:", err.message);
+    res.status(500).json({ erro: err.message });
+  }
+});
 
-      listaOrdenada.forEach(loja => {
-        const checked = idsAtuais.includes(String(loja.id)) ? "checked" : "";
-        container.innerHTML += `
-          <label class="item-loja-modal" data-texto="[${loja.id}] ${loja.nome} ${loja.gerente || ''}">
-            <div>
-              <input type="checkbox" value="${loja.id}" ${checked} style="width: auto; margin-right: 8px;"> 
-              <strong>[${loja.id}]</strong> ${loja.nome}
-            </div>
-            <span style="color: #666; font-size: 11px;">Gerente: ${loja.gerente || '-'}</span>
-          </label>
-        `;
-      });
-    }
-
-    function filtrarLojasNoModal() {
-      const termo = document.getElementById("inputFiltroGerenteModal").value.trim().toUpperCase();
-      const labels = document.querySelectorAll("#listaLojasModal .item-loja-modal");
-      labels.forEach(label => {
-        const texto = label.getAttribute("data-texto").toUpperCase();
-        label.style.display = (texto.includes(termo) || termo === "") ? "flex" : "none";
-      });
-    }
-
-    function fecharModalLojas() { document.getElementById("modalLojas").style.display = "none"; }
-
-    function toggleSelecionarTodasLojas(master) {
-      document.querySelectorAll("#listaLojasModal .item-loja-modal").forEach(label => {
-        if (label.style.display !== "none") {
-          const cb = label.querySelector("input[type='checkbox']");
-          if (cb) cb.checked = master.checked;
-        }
-      });
-    }
-
-    function confirmarSelecaoLojas() {
-      const ids = [];
-      document.querySelectorAll("#listaLojasModal input[type='checkbox']").forEach(cb => { if (cb.checked) ids.push(cb.value); });
-      document.getElementById("lojas").value = ids.join(",");
-      fecharModalLojas();
-    }
-
-    async function consultar() {
-      document.getElementById("loadingOverlay").style.display = "flex";
-      document.getElementById("resultado").innerHTML = "";
-
-      const body = {
-        LOJAS: document.getElementById("lojas").value
-      };
-
-      try {
-        const response = await fetch("/consulta", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body)
-        });
-        
-        if (!response.ok) throw new Error("Erro na requisição HTTP: " + response.status);
-        
-        const dadosApi = await response.json();
-        renderizarGridPuro(dadosApi);
-      } catch (error) {
-        document.getElementById("resultado").innerHTML = "<p class='erro'>" + error.message + "</p>";
-      } finally {
-        document.getElementById("loadingOverlay").style.display = "none";
-      }
-    }
-
-    function renderizarGridPuro(dados) {
-      const thead = document.getElementById("cabecalhoTabela");
-      const tbody = document.getElementById("corpoTabela");
-      const labelTotal = document.getElementById("totalRegistros");
-
-      thead.innerHTML = "";
-      tbody.innerHTML = "";
-
-      if (!dados || dados.length === 0) {
-        labelTotal.textContent = "0 registros encontrados";
-        thead.innerHTML = "<tr><th>Mensagem</th></tr>";
-        tbody.innerHTML = "<tr><td style='text-align: center;'>Nenhum registro encontrado.</td></tr>";
-        return;
-      }
-
-      labelTotal.textContent = `${dados.length.toLocaleString('pt-BR')} registros encontrados`;
-
-      // 1. Extrai o nome de todas as chaves do primeiro registro para montar os cabeçalhos
-      const colunas = Object.keys(dados[0]);
-
-      // 2. Monta o Cabeçalho (TH) dinamicamente
-      let trHead = document.createElement("tr");
-      colunas.forEach(coluna => {
-        let th = document.createElement("th");
-        th.textContent = coluna;
-        trHead.appendChild(th);
-      });
-      thead.appendChild(trHead);
-
-      // 3. Preenche as Linhas (TR e TD) dinamicamente com os valores
-      dados.forEach(item => {
-        let tr = document.createElement("tr");
-        colunas.forEach(coluna => {
-          let td = document.createElement("td");
-          let valor = item[coluna];
-          td.textContent = (valor === null || valor === undefined) ? "-" : valor;
-          tr.appendChild(td);
-        });
-        tbody.appendChild(tr);
-      });
-    }
-  </script>
-</body>
-</html>
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
