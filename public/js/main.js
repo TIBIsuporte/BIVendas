@@ -104,7 +104,7 @@ function processarDadosBI(dados) {
         DESCONTOVALORPRODUTO: 0,
         VALORLIQUIDOTOTALVENDA: 0,
         TIPOVENDA: tipoVenda,
-        EHDEVOLUCAO: item.EHDEVOLUCAO
+        EHDEVOLUCAO: String(item.EHDEVOLUCAO || "").trim().toUpperCase()
       };
     }
 
@@ -125,21 +125,19 @@ function processarDadosBI(dados) {
     Object.keys(ordensServico).forEach(os => {
       const venda = ordensServico[os];
       
-      if (venda.TIPOVENDA === "DEVOLUCAO") {
-        return; 
-      }
-
       const vBruto = venda.VALORBRUTO;
       const vDesconto = venda.DESCONTOVALORPRODUTO;
       const vLiquido = venda.VALORLIQUIDOTOTALVENDA;
 
+      // Tratamento corrigido: se for devolução, acumula no total de devolução e pula os totais de venda normal
+      if (venda.TIPOVENDA === "DEVOLUCAO" || venda.EHDEVOLUCAO === "S" || venda.EHDEVOLUCAO === "SIM" || vLiquido < 0) {
+        totalDevolucaoGeral += Math.abs(vLiquido);
+        return; 
+      }
+
       totalBrutoGeral += vBruto;
       totalDescontoGeral += vDesconto;
       totalLiquidoGeral += vLiquido;
-
-      if (venda.EHDEVOLUCAO === "S" || venda.EHDEVOLUCAO === "SIM" || vLiquido < 0) {
-        totalDevolucaoGeral += Math.abs(vLiquido);
-      }
 
       if (vLiquido > 0) {
         qtdeVendasGeral++;
@@ -147,6 +145,7 @@ function processarDadosBI(dados) {
     });
   });
 
+  // Atualiza os cards na tela
   document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);
   document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);
   document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoGeral);
