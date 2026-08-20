@@ -1,9 +1,8 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Auditoria: Relatório de OS Pendentes</title>
+  <title>Auditoria: BI</title>
   
   <!-- Importando Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -14,7 +13,7 @@
 <body>
 
   <div class="header-titulo">
-    <h2>Auditoria: Relatório de OS Pendentes</h2>
+    <h2>Auditoria: BI</h2>
     <span class="titulo-aga">by AGA</span>
   </div>
 
@@ -194,8 +193,17 @@
       if (lojasDigitadas) {
         const idsFiltro = lojasDigitadas.split(",").map(id => id.trim());
         dadosFiltrados = dados.filter(item => {
-          const codLoja = String(item.CODIGOLOJA ?? item.LOJA ?? item.loja ?? item.IdLoja ?? "").trim();
-          return idsFiltro.includes(codLoja);
+          // Pega o texto da loja considerando LOJANOME e outras variações
+          const textoLojaCompleto = String(item.LOJANOME ?? item.CODIGOLOJA ?? item.LOJA ?? item.loja ?? item.IdLoja ?? "").trim();
+          
+          // Extrai o código numérico inicial (ex: "0004 - OTICA..." vira "4" ou "0004")
+          const matchCodigo = textoLojaCompleto.match(/^0*(\d+)/);
+          const codigoExtraido = matchCodigo ? matchCodigo[1] : textoLojaCompleto;
+          const codigoSemZeroEsquerda = matchCodigo ? String(parseInt(matchCodigo[1], 10)) : codigoExtraido;
+
+          return idsFiltro.includes(codigoExtraido) || 
+                 idsFiltro.includes(codigoSemZeroEsquerda) || 
+                 idsFiltro.some(id => textoLojaCompleto.toLowerCase().includes(id.toLowerCase()));
         });
       }
 
