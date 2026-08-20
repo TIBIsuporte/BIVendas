@@ -9,6 +9,38 @@
 
   <!-- Importando CSS Externo -->
   <link rel="stylesheet" href="/css/style.css">
+  
+  <!-- Estilos rápidos para os Cards de BI -->
+  <style>
+    .bi-cards-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 15px;
+      margin: 20px 0;
+    }
+    .bi-card {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 15px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .bi-card-title {
+      font-size: 12px;
+      color: #666;
+      text-transform: uppercase;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+    .bi-card-value {
+      font-size: 20px;
+      font-weight: bold;
+      color: #333;
+    }
+  </style>
 </head>
 <body>
 
@@ -47,6 +79,30 @@
   </div>
 
   <div id="resultado"></div>
+
+  <!-- Cards de Indicadores de BI -->
+  <div class="bi-cards-container" id="biCardsContainer" style="display: none;">
+    <div class="bi-card">
+      <div class="bi-card-title">Valor Bruto</div>
+      <div class="bi-card-value" id="cardValorBruto">R$ 0,00</div>
+    </div>
+    <div class="bi-card">
+      <div class="bi-card-title">Desconto</div>
+      <div class="bi-card-value" id="cardDesconto" style="color: #d9534f;">R$ 0,00</div>
+    </div>
+    <div class="bi-card">
+      <div class="bi-card-title">Valor Líquido</div>
+      <div class="bi-card-value" id="cardValorLiquido" style="color: #0275d8;">R$ 0,00</div>
+    </div>
+    <div class="bi-card">
+      <div class="bi-card-title">Devolução</div>
+      <div class="bi-card-value" id="cardDevolucao" style="color: #f0ad4e;">R$ 0,00</div>
+    </div>
+    <div class="bi-card">
+      <div class="bi-card-title">Qtde Vendas (O.S.)</div>
+      <div class="bi-card-value" id="cardQtdeVendas">0</div>
+    </div>
+  </div>
 
   <!-- Grid Principal -->
   <div class="grid-container">
@@ -104,7 +160,6 @@
     const SUPABASE_KEY = 'sb_publishable_biWjIRo9x6maeZXcoKX6Lw_l-fjV0wP';
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // Lista atualizada com base nos campos numéricos/valores retornados pela API ProdutosPorOS
     const COLUNAS_VALORES_TOTALIZAR = [
       'QUANTIDADETOTAL',
       'VALORBRUTO',
@@ -155,6 +210,7 @@
         if (!response.ok) throw new Error("Erro na requisição: " + response.status);
 
         const dadosBrutos = await response.json();
+        processarDadosBI(dadosBrutos);
         renderizarGridTodosCampos(dadosBrutos);
       } catch (error) {
         document.getElementById("resultado").innerHTML = "<p class='erro'>" + error.message + "</p>";
@@ -162,6 +218,103 @@
       } finally {
         document.getElementById("loadingOverlay").style.display = "none";
       }
+    }
+
+    // Função para processar os cards de BI agrupando por Loja e por O.S. (CODIGODAVENDA)
+    function processarDadosBI(dados) {
+      if (!dados || dados.length === 0) {
+        document.getElementById("biCardsContainer").style.display = "none";
+        return;
+      }
+
+      // Filtro de loja aplicado no front caso venha multi-loja
+      const lojasDigitadas = document.getElementById("lojas").value.trim();
+      let dadosFiltrados = dados;
+
+      if (lojasDigitadas) {
+        const idsFiltro = lojasDigitadas.split(",").map(id => id.trim());
+        dadosFiltrados = dados.filter(item => {
+          const textoLojaCompleto = String(item.LOJANOME ?? item.CODIGOLOJA ?? item.LOJA ?? item.loja ?? item.IdLoja ?? "").trim();
+          const matchCodigo = textoLojaCompleto.match(/^0*(\d+)/);
+          const codigoExtraido = matchCodigo ? matchCodigo[1] : textoLojaCompleto;
+          const codigoSemZeroEsquerda = matchCodigo ? String(parseInt(matchCodigo[1], 10)) : codigoExtraido;
+
+          return idsFiltro.includes(codigoExtraido) || 
+                 idsFiltro.includes(codigoSemZeroEsquerda) || 
+                 idsFiltro.some(id => textoLojaCompleto.toLowerCase().includes(id.toLowerCase()));
+        });
+      }
+
+      // Agrupamento por Loja -> O.S. (CODIGODAVENDA)
+      // Como um produto pode se repetir na mesma O.S., consolidamos os valores por O.S. única dentro de cada loja
+      const lojasMap = {};
+
+      dadosFiltrados.forEach(item => {
+        const lojaNome = item.LOJANOME || "LOJA GERAL";
+        const osId = item.CODIGODAVENDA;
+
+        if (!lojasMap[lojaNome]) {
+          lojasMap[lojaNome] = {};
+        }
+
+        if (!lojasMap[lojaNome][osId]) {
+          lojasMap[lojaNome][osId] = {
+            VALORBRUTO: 0,
+            DESCONTOVALORPRODUTO: 0,
+            VALORLIQUIDOTOTALVENDA: 0,
+            EHDEVOLUCAO: item.EHDEVOLUCAO
+          };
+        }
+
+        // Acumula os valores dos produtos da mesma O.S.
+        lojasMap[lojaNome][osId].VALORBRUTO += parseNumeroBR(item.VALORBRUTO);
+        lojasMap[lojaNome][osId].DESCONTOVALORPRODUTO += parseNumeroBR(item.DESCONTOVALORPRODUTO);
+        // O valor líquido total da venda costuma vir repetido por linha, mas pegamos o max ou somamos se for fracionado. 
+        // Usamos o valor do item ou atribuímos o valor líquido consolidado da venda:
+        lojasMap[lojaNome][osId].VALORLIQUIDOTOTALVENDA = parseNumeroBR(item.VALORLIQUIDOTOTALVENDA);
+      });
+
+      // Totais gerais para os Cards
+      let totalBrutoGeral = 0;
+      let totalDescontoGeral = 0;
+      let totalLiquidoGeral = 0;
+      let totalDevolucaoGeral = 0;
+      let qtdeVendasGeral = 0;
+
+      // Percorre Loja por Loja e O.S. por O.S.
+      Object.keys(lojasMap).forEach(loja => {
+        const ordensServico = lojasMap[loja];
+
+        Object.keys(ordensServico).forEach(os => {
+          const venda = ordensServico[os];
+          const vBruto = venda.VALORBRUTO;
+          const vDesconto = venda.DESCONTOVALORPRODUTO;
+          const vLiquido = venda.VALORLIQUIDOTOTALVENDA;
+
+          totalBrutoGeral += vBruto;
+          totalDescontoGeral += vDesconto;
+          totalLiquidoGeral += vLiquido;
+
+          // Verifica se é devolução explícita ou valor líquido negativo/zero
+          if (venda.EHDEVOLUCAO === "S" || venda.EHDEVOLUCAO === "SIM" || vLiquido < 0) {
+            totalDevolucaoGeral += Math.abs(vLiquido);
+          }
+
+          // Regra de contagem: Cada O.S. é uma venda, exceto se total for igual ou menor que zero
+          if (vLiquido > 0) {
+            qtdeVendasGeral++;
+          }
+        });
+      });
+
+      // Atualiza os elementos na tela
+      document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);
+      document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);
+      document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoGeral);
+      document.getElementById("cardDevolucao").textContent = formatarMoedaBR(totalDevolucaoGeral);
+      document.getElementById("cardQtdeVendas").textContent = qtdeVendasGeral.toLocaleString('pt-BR');
+
+      document.getElementById("biCardsContainer").style.display = "grid";
     }
 
     function renderizarGridTodosCampos(dados) {
@@ -188,7 +341,6 @@
         const idsFiltro = lojasDigitadas.split(",").map(id => id.trim());
         dadosFiltrados = dados.filter(item => {
           const textoLojaCompleto = String(item.LOJANOME ?? item.CODIGOLOJA ?? item.LOJA ?? item.loja ?? item.IdLoja ?? "").trim();
-          
           const matchCodigo = textoLojaCompleto.match(/^0*(\d+)/);
           const codigoExtraido = matchCodigo ? matchCodigo[1] : textoLojaCompleto;
           const codigoSemZeroEsquerda = matchCodigo ? String(parseInt(matchCodigo[1], 10)) : codigoExtraido;
@@ -264,6 +416,7 @@
       document.getElementById("cabecalhoTabela").innerHTML = "<tr><th>Status</th></tr>";
       document.getElementById("corpoTabela").innerHTML = "<tr><td style='text-align: center; color: red;'>Erro ao carregar dados.</td></tr>";
       document.getElementById("rodapeTabela").innerHTML = "";
+      document.getElementById("biCardsContainer").style.display = "none";
     }
   </script>
 </body>
