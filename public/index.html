@@ -220,14 +220,13 @@
       }
     }
 
-    // Função para processar os cards de BI agrupando por Loja e por O.S. (CODIGODAVENDA)
+    // Função de BI atualizada para tratar O.S. únicas e desconsiderar TIPOVENDA = DEVOLUCAO
     function processarDadosBI(dados) {
       if (!dados || dados.length === 0) {
         document.getElementById("biCardsContainer").style.display = "none";
         return;
       }
 
-      // Filtro de loja aplicado no front caso venha multi-loja
       const lojasDigitadas = document.getElementById("lojas").value.trim();
       let dadosFiltrados = dados;
 
@@ -245,13 +244,13 @@
         });
       }
 
-      // Agrupamento por Loja -> O.S. (CODIGODAVENDA)
-      // Como um produto pode se repetir na mesma O.S., consolidamos os valores por O.S. única dentro de cada loja
+      // Mapeamento para agrupar por Loja e depois por O.S. (CODIGODAVENDA)
       const lojasMap = {};
 
       dadosFiltrados.forEach(item => {
         const lojaNome = item.LOJANOME || "LOJA GERAL";
         const osId = item.CODIGODAVENDA;
+        const tipoVenda = String(item.TIPOVENDA || "").trim().toUpperCase();
 
         if (!lojasMap[lojaNome]) {
           lojasMap[lojaNome] = {};
@@ -262,31 +261,37 @@
             VALORBRUTO: 0,
             DESCONTOVALORPRODUTO: 0,
             VALORLIQUIDOTOTALVENDA: 0,
+            TIPOVENDA: tipoVenda,
             EHDEVOLUCAO: item.EHDEVOLUCAO
           };
         }
 
-        // Acumula os valores dos produtos da mesma O.S.
+        // Acumula os valores dos produtos pertencentes a esta O.S.
         lojasMap[lojaNome][osId].VALORBRUTO += parseNumeroBR(item.VALORBRUTO);
         lojasMap[lojaNome][osId].DESCONTOVALORPRODUTO += parseNumeroBR(item.DESCONTOVALORPRODUTO);
-        // O valor líquido total da venda costuma vir repetido por linha, mas pegamos o max ou somamos se for fracionado. 
-        // Usamos o valor do item ou atribuímos o valor líquido consolidado da venda:
+        
+        // Atribui o valor líquido consolidado da O.S.
         lojasMap[lojaNome][osId].VALORLIQUIDOTOTALVENDA = parseNumeroBR(item.VALORLIQUIDOTOTALVENDA);
       });
 
-      // Totais gerais para os Cards
       let totalBrutoGeral = 0;
       let totalDescontoGeral = 0;
       let totalLiquidoGeral = 0;
       let totalDevolucaoGeral = 0;
       let qtdeVendasGeral = 0;
 
-      // Percorre Loja por Loja e O.S. por O.S.
+      // Percorre loja por loja e cada O.S. única de dentro dela
       Object.keys(lojasMap).forEach(loja => {
         const ordensServico = lojasMap[loja];
 
         Object.keys(ordensServico).forEach(os => {
           const venda = ordensServico[os];
+          
+          // Regra aplicada: se o TIPOVENDA for DEVOLUCAO, a O.S. fica de fora dos totais
+          if (venda.TIPOVENDA === "DEVOLUCAO") {
+            return; 
+          }
+
           const vBruto = venda.VALORBRUTO;
           const vDesconto = venda.DESCONTOVALORPRODUTO;
           const vLiquido = venda.VALORLIQUIDOTOTALVENDA;
@@ -295,19 +300,19 @@
           totalDescontoGeral += vDesconto;
           totalLiquidoGeral += vLiquido;
 
-          // Verifica se é devolução explícita ou valor líquido negativo/zero
+          // Se houver indicação de devolução explícita ou valor líquido negativo
           if (venda.EHDEVOLUCAO === "S" || venda.EHDEVOLUCAO === "SIM" || vLiquido < 0) {
             totalDevolucaoGeral += Math.abs(vLiquido);
           }
 
-          // Regra de contagem: Cada O.S. é uma venda, exceto se total for igual ou menor que zero
+          // Conta apenas O.S. válidas (maior que zero e que não sejam devolução)
           if (vLiquido > 0) {
             qtdeVendasGeral++;
           }
         });
       });
 
-      // Atualiza os elementos na tela
+      // Atualiza os cards na tela
       document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);
       document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);
       document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoGeral);
