@@ -23,7 +23,7 @@ app.post("/consulta", async (req, res) => {
 
   try {
     // const response = await fetch("https://api.savwinweb.com.br/api/APIRelatoriosCR/ProdutosPorOSGrid", {
-    const response = await fetch("https://api.savwinweb.com.br/api/APIDados/RetornaVendasPendentesCompletas{
+    const response = await fetch("https://api.savwinweb.com.br/api/APIDados/RetornaVendasPendentesCompletas",{
       
       method: "POST",
       headers: {
