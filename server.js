@@ -23,13 +23,15 @@ app.post("/consulta", async (req, res) => {
   const body = {
     DATAINICIAL: req.body.DATAINICIAL || "",
     DATAFINAL: req.body.DATAFINAL || "",
-    LOJAS: req.body.LOJAS || ""
+    LOJAS: req.body.LOJAS || "",
+    TIPODATA: req.body.TIPODATA || "VENDA",
+    TIPOVENDA: req.body.TIPOVENDA || ""
   };
 
-  console.log("Body enviado para RetornaVendasPendentesCompletas:", body);
+  console.log("Body enviado para ProdutosPorOS:", body);
 
   try {
-    const response = await fetch("https://api.savwinweb.com.br/api/APIDados/RetornaVendasPendentesCompletas", {
+    const response = await fetch("https://api.savwinweb.com.br/api/APIRelatoriosCR/ProdutosPorOS", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
