@@ -6,7 +6,7 @@ const app = express();
 app.use(express.json({ limit: "10mb" }));
 app.use(cors());
 
-app.use(express.static(__dirname));
+app.use(express.static(__dirname + '/public'));
 
 const SUPABASE_URL = "https://cwmofpwuihrnifsvqhik.supabase.co";
 const SUPABASE_KEY = "sb_publishable_biWjIRo9x6maeZXcoKX6Lw_l-fjV0wP";
