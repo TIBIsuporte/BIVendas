@@ -69,6 +69,9 @@ function processarDadosBI(dados) {
     return;
   }
 
+  // DEBUG: Abre o console do navegador (F12) para inspecionar os dados retornados pela API
+  console.log("=== DADOS RECEBIDOS DA API ===", dados);
+
   const lojasDigitadas = document.getElementById("lojas").value.trim();
   let dadosFiltrados = dados;
 
@@ -92,6 +95,9 @@ function processarDadosBI(dados) {
     const lojaNome = item.LOJANOME || "LOJA GERAL";
     const osId = item.CODIGODAVENDA;
     const tipoVenda = String(item.TIPOVENDA || "").trim().toUpperCase();
+
+    // DEBUG individual por O.S./Item no console
+    console.log(`O.S: ${osId} | Tipo Venda: '${tipoVenda}' | Eh Devolucao: '${item.EHDEVOLUCAO}' | Valor Líquido: ${item.VALORLIQUIDOTOTALVENDA}`);
 
     if (!lojasMap[lojaNome]) {
       lojasMap[lojaNome] = {};
@@ -128,9 +134,15 @@ function processarDadosBI(dados) {
       const vDesconto = venda.DESCONTOVALORPRODUTO;
       const vLiquido = venda.VALORLIQUIDOTOTALVENDA;
 
-      // Se for devolução ou valor líquido negativo, contabiliza apenas no card de devolução e descarta das vendas normais
-      if (venda.TIPOVENDA === "DEVOLUCAO" || venda.EHDEVOLUCAO === "S" || venda.EHDEVOLUCAO === "SIM" || vLiquido < 0) {
+      const tVenda = venda.TIPOVENDA;
+      const ehDev = venda.EHDEVOLUCAO;
+      
+      // Validação ampliada para capturar variações de devolução e valores negativos
+      const eDevolucao = tVenda.includes("DEV") || tVenda.includes("ESTORNO") || ehDev === "S" || ehDev === "SIM" || vLiquido < 0;
+
+      if (eDevolucao) {
         totalDevolucaoGeral += Math.abs(vLiquido);
+        console.log(`-> O.S. ${os} CLASSIFICADA COMO DEVOLUÇÃO. Valor Absoluto: ${Math.abs(vLiquido)}`);
         return; 
       }
 
