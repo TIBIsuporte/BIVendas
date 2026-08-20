@@ -124,11 +124,11 @@ function processarDadosBI(dados) {
     Object.keys(ordensServico).forEach(os => {
       const venda = ordensServico[os];
       
-      const vBruto = Math.abs(venda.VALORBRUTO);
-      const vDesconto = Math.abs(venda.DESCONTOVALORPRODUTO);
+      const vBruto = venda.VALORBRUTO;
+      const vDesconto = venda.DESCONTOVALORPRODUTO;
       const vLiquido = venda.VALORLIQUIDOTOTALVENDA;
 
-      // Se for devolução, contabiliza apenas no card de devolução e descarta dos totais de vendas normais
+      // Se for devolução ou valor líquido negativo, contabiliza apenas no card de devolução e descarta das vendas normais
       if (venda.TIPOVENDA === "DEVOLUCAO" || venda.EHDEVOLUCAO === "S" || venda.EHDEVOLUCAO === "SIM" || vLiquido < 0) {
         totalDevolucaoGeral += Math.abs(vLiquido);
         return; 
