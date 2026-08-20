@@ -14,9 +14,10 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 app.post("/consulta", async (req, res) => {
   const body = {
-    DATAINICIAL: req.body.DATAINICIAL ?? "",
-    DATAFINAL: req.body.DATAFINAL ?? "",
-    LOJAS: req.body.LOJAS ?? ""
+    DATAINICIAL: req.body.DATAINICIAL || "",
+    DATAFINAL: req.body.DATAFINAL || "",
+    LOJAS: req.body.LOJAS || "",
+
   };
 
   console.log("Body enviado para ProdutosPorOSGrid:", body);
