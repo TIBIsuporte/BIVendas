@@ -16,16 +16,13 @@ app.post("/consulta", async (req, res) => {
   const body = {
     DATAINICIAL: req.body.DATAINICIAL || "",
     DATAFINAL: req.body.DATAFINAL || "",
-    LOJAS: req.body.LOJAS || "",
-
+    LOJAS: req.body.LOJAS || ""
   };
 
-  console.log("Body enviado para ProdutosPorOSGrid:", body);
+  console.log("Body enviado para RetornaVendasPendentesCompletas:", body);
 
   try {
-    // const response = await fetch("https://api.savwinweb.com.br/api/APIRelatoriosCR/ProdutosPorOSGrid", {
-    const response = await fetch("https://api.savwinweb.com.br/api/APIDados/RetornaVendasPendentesCompletas",{
-      
+    const response = await fetch("https://api.savwinweb.com.br/api/APIDados/RetornaVendasPendentesCompletas", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -43,7 +40,19 @@ app.post("/consulta", async (req, res) => {
       return res.status(response.status).json({ erro: "Erro na API externa", detalhe: errorText });
     }
 
-    const data = await response.json();
+    let data = await response.json();
+
+    // FILTRO DE SEGURANÇA NO SERVER
+    if (body.LOJAS && Array.isArray(data)) {
+      const lojasFiltro = body.LOJAS.split(",").map(id => id.trim());
+
+      data = data.filter(item => {
+        // Mapeia os possíveis nomes que a API usa para o código da loja
+        const codigoLojaItem = String(item.CODIGOLOJA ?? item.LOJA ?? item.loja ?? item.IdLoja ?? "").trim();
+        return lojasFiltro.includes(codigoLojaItem);
+      });
+    }
+
     res.json(data);
   } catch (err) {
     console.error("Erro de conexão ou timeout na chamada da API:", err.message);
