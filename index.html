@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Consulta de Lojas - BI Vendas</title>
+  <title>Consulta de Dados - BI Vendas</title>
   <!-- Importando Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -73,7 +73,7 @@
 <body>
 
   <div class="header-titulo">
-    <h2>Consulta de Lojas - BI Vendas</h2>
+    <h2>Consulta de Dados Brutos - BI Vendas</h2>
     <span class="titulo-aga">by AGA</span>
   </div>
 
@@ -81,9 +81,17 @@
     <div class="linha">
       <label>Lojas (IDs separados por vírgula):
         <div class="input-grupo" style="margin-top: 5px;">
-          <input type="text" id="lojas" placeholder="Ex: 1,2 ou selecione no botão">
+          <input type="text" id="lojas" placeholder="Ex: 1,3,7,50 ou selecione no botão">
           <button type="button" class="btn-modal" onclick="abrirModalLojas()">Selecionar Lojas</button>
         </div>
+      </label>
+    </div>
+    <div class="linha">
+      <label>Data Inicial:
+        <input type="date" id="dataInicial">
+      </label>
+      <label>Data Final:
+        <input type="date" id="dataFinal">
       </label>
     </div>
     <button class="btn-acao" onclick="consultar()">Consultar Dados</button>
@@ -103,7 +111,7 @@
           <tr><th>Aguardando Consulta</th></tr>
         </thead>
         <tbody id="corpoTabela">
-          <tr><td style="text-align: center; color: #777;">Selecione as lojas e clique em Consultar Dados.</td></tr>
+          <tr><td style="text-align: center; color: #777;">Preencha os filtros acima e clique em Consultar Dados.</td></tr>
         </tbody>
       </table>
     </div>
@@ -211,11 +219,20 @@
       fecharModalLojas();
     }
 
+    // Converte o valor do input type="date" (AAAA-MM-DD) para DD/MM/AAAA
+    function formatarDataISOparaBR(dataISO) {
+      if (!dataISO) return "";
+      const p = dataISO.split("-");
+      return `${p[2]}/${p[1]}/${p[0]}`;
+    }
+
     async function consultar() {
       document.getElementById("loadingOverlay").style.display = "flex";
       document.getElementById("resultado").innerHTML = "";
 
       const body = {
+        DATAINICIAL: formatarDataISOparaBR(document.getElementById("dataInicial").value),
+        DATAFINAL: formatarDataISOparaBR(document.getElementById("dataFinal").value),
         LOJAS: document.getElementById("lojas").value
       };
 
@@ -254,10 +271,10 @@
 
       labelTotal.textContent = `${dados.length.toLocaleString('pt-BR')} registros encontrados`;
 
-      // 1. Extrai o nome de todas as chaves do primeiro registro para montar os cabeçalhos
+      // Captura o nome das chaves do primeiro item do JSON retornado pela API
       const colunas = Object.keys(dados[0]);
 
-      // 2. Monta o Cabeçalho (TH) dinamicamente
+      // Monta o Cabeçalho (TH) dinamicamente com os nomes das colunas da API
       let trHead = document.createElement("tr");
       colunas.forEach(coluna => {
         let th = document.createElement("th");
@@ -266,7 +283,7 @@
       });
       thead.appendChild(trHead);
 
-      // 3. Preenche as Linhas (TR e TD) dinamicamente com os valores
+      // Preenche as Linhas (TR e TD) com todos os dados brutos recebidos
       dados.forEach(item => {
         let tr = document.createElement("tr");
         colunas.forEach(coluna => {
