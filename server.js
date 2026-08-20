@@ -1,12 +1,19 @@
 const express = require("express");
 const cors = require("cors");
 const { createClient } = require("@supabase/supabase-js");
+const path = require("path");
 
 const app = express();
 app.use(express.json({ limit: "10mb" }));
 app.use(cors());
 
-app.use(express.static(__dirname + '/public'));
+// Serve os arquivos estáticos da pasta public
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Rota raiz para carregar o index.html
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 const SUPABASE_URL = "https://cwmofpwuihrnifsvqhik.supabase.co";
 const SUPABASE_KEY = "sb_publishable_biWjIRo9x6maeZXcoKX6Lw_l-fjV0wP";
@@ -33,32 +40,15 @@ app.post("/consulta", async (req, res) => {
     });
 
     console.log("Status da resposta da API:", response.status);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Erro retornado pela API Savwin:", errorText);
-      return res.status(response.status).json({ erro: "Erro na API externa", detalhe: errorText });
-    }
-
-    let data = await response.json();
-
-    // FILTRO DE SEGURANÇA NO SERVER
-    if (body.LOJAS && Array.isArray(data)) {
-      const lojasFiltro = body.LOJAS.split(",").map(id => id.trim());
-
-      data = data.filter(item => {
-        // Mapeia os possíveis nomes que a API usa para o código da loja
-        const codigoLojaItem = String(item.CODIGOLOJA ?? item.LOJA ?? item.loja ?? item.IdLoja ?? "").trim();
-        return lojasFiltro.includes(codigoLojaItem);
-      });
-    }
-
+    const data = await response.json();
     res.json(data);
-  } catch (err) {
-    console.error("Erro de conexão ou timeout na chamada da API:", err.message);
-    res.status(500).json({ erro: err.message });
+  } catch (error) {
+    console.error("Erro na API externa:", error);
+    res.status(500).json({ error: error.message });
   }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
+});
