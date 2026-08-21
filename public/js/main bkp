@@ -1,14 +1,14 @@
-// Configuração exclusiva do Supabase (apenas chave pública / anon)
 const SUPABASE_URL = 'https://cwmofpwuihrnifsvqhik.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_biWjIRo9x6maeZXcoKX6Lw_l-fjV0wP';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// Colunas atualizadas para a nova estrutura baseada em itens por OS
 const COLUNAS_VALORES_TOTALIZAR = [
-  'QUANTIDADETOTAL',
-  'VALORBRUTO',
-  'DESCONTOVALORPRODUTO',
-  'VALORLIQUIDOTOTALVENDA',
-  'PRECOTOTALPRODUTO'
+  'QUANTIDADE',
+  'VALORBRUTOPRODUTO',
+  'DESCPRODUTO',
+  'LIQUIDOPRODUTO',
+  'CUSTO'
 ];
 
 window.onload = async () => {
@@ -76,7 +76,7 @@ function processarDadosBI(dados) {
   if (lojasDigitadas) {
     const idsFiltro = lojasDigitadas.split(",").map(id => id.trim());
     dadosFiltrados = dados.filter(item => {
-      const textoLojaCompleto = String(item.LOJANOME ?? item.CODIGOLOJA ?? item.LOJA ?? item.loja ?? item.IdLoja ?? "").trim();
+      const textoLojaCompleto = String(item.LOJANOME ?? item.CODIGOLOJA ?? item.LOJA ?? "").trim();
       const matchCodigo = textoLojaCompleto.match(/^0*(\d+)/);
       const codigoExtraido = matchCodigo ? matchCodigo[1] : textoLojaCompleto;
       const codigoSemZeroEsquerda = matchCodigo ? String(parseInt(matchCodigo[1], 10)) : codigoExtraido;
@@ -87,88 +87,88 @@ function processarDadosBI(dados) {
     });
   }
 
-  const lojasMap = {};
+  // AGRUPAMENTO POR O.S. (Garante que somamos os itens da O.S. antes de avaliar as regras)
+  const osMap = {};
 
   dadosFiltrados.forEach(item => {
-    const lojaNome = item.LOJANOME || "LOJA GERAL";
-    const osId = String(item.CODIGODAVENDA || "").trim();
-    const tipoVenda = String(item.TIPOVENDA || "").trim().toUpperCase();
+    const osId = String(item.OS || item.CODIGODAVENDA || "").trim();
+    if (!osId) return;
 
-    if (!lojasMap[lojaNome]) {
-      lojasMap[lojaNome] = {};
-    }
-
-    if (!lojasMap[lojaNome][osId]) {
-      lojasMap[lojaNome][osId] = {
-        VALORBRUTO: 0,
-        DESCONTOVALORPRODUTO: 0,
-        VALORLIQUIDOTOTALVENDA: 0,
-        PRECOTOTALPRODUTO: 0,
-        TIPOVENDA: tipoVenda,
-        EHDEVOLUCAO: String(item.EHDEVOLUCAO || "").trim().toUpperCase()
+    if (!osMap[osId]) {
+      osMap[osId] = {
+        os: osId,
+        valorBrutoOS: 0,
+        somaDescontoItens: 0,
+        liquidoOS: 0,
+        descontoVendaGlobal: parseNumeroBR(item.DESCONTOVENDA),
+        liquidoVendaGlobal: parseNumeroBR(item.VLRLIQUIDOVENDA || item.VALORLIQUIDOPRODUTO || 0),
+        ehDevolucaoFlag: String(item.EHDEVOLUCAO || "").trim().toUpperCase() === "D",
+        tipoVenda: String(item.TIPOVENDA || "").trim().toUpperCase()
       };
     }
 
-    lojasMap[lojaNome][osId].VALORBRUTO += parseNumeroBR(item.VALORBRUTO);
-    lojasMap[lojaNome][osId].DESCONTOVALORPRODUTO += parseNumeroBR(item.DESCONTOVALORPRODUTO);
-    lojasMap[lojaNome][osId].VALORLIQUIDOTOTALVENDA += parseNumeroBR(item.VALORLIQUIDOTOTALVENDA);
-    lojasMap[lojaNome][osId].PRECOTOTALPRODUTO += parseNumeroBR(item.PRECOTOTALPRODUTO);
+    osMap[osId].valorBrutoOS += parseNumeroBR(item.VALORBRUTOPRODUTO);
+    osMap[osId].somaDescontoItens += parseNumeroBR(item.DESCPRODUTO);
+    osMap[osId].liquidoOS += parseNumeroBR(item.LIQUIDOPRODUTO);
   });
 
   let totalBrutoGeral = 0;
   let totalDescontoGeral = 0;
   let totalDevolucaoGeral = 0;
-  
   let qtdeVendasNormais = 0;
   let qtdeDevolucoes = 0;
 
-  Object.keys(lojasMap).forEach(loja => {
-    const ordensServico = lojasMap[loja];
+  console.group("🔍 LOG DE PROCESSAMENTO (POR O.S.)");
 
-    Object.keys(ordensServico).forEach(os => {
-      const venda = ordensServico[os];
+  Object.keys(osMap).forEach(osId => {
+    const venda = osMap[osId];
+    
+    // 1. Devolução Real
+    const eDevolucaoReal = venda.ehDevolucaoFlag && (venda.tipoVenda === "DEVOLUCAO" || venda.tipoVenda.includes("DEV"));
+
+    if (eDevolucaoReal) {
+      const valorDev = Math.abs(venda.liquidoOS > 0 ? venda.liquidoOS : venda.valorBrutoOS);
+      totalDevolucaoGeral += valorDev;
+      qtdeDevolucoes++;
+      return;
+    }
+
+    // 2. Troca (DESCONTOVENDA vai para Devolução)
+    if (venda.tipoVenda === "TROCA") {
+      const valorDevolucaoTroca = venda.descontoVendaGlobal;
+      totalDevolucaoGeral += valorDevolucaoTroca;
       
-      const vBruto = venda.VALORBRUTO;
-      const vDesconto = venda.DESCONTOVALORPRODUTO;
-      const vLiquido = venda.VALORLIQUIDOTOTALVENDA;
-      const vPrecoTotalProd = venda.PRECOTOTALPRODUTO;
+      totalBrutoGeral += venda.valorBrutoOS;
 
-      const tVenda = venda.TIPOVENDA;
-      const ehDev = venda.EHDEVOLUCAO;
-      
-      const eDevolucao = tVenda.includes("DEV") || tVenda.includes("ESTORNO") || ehDev === "S" || ehDev === "SIM" || vPrecoTotalProd < 0 || vLiquido < 0;
-
-      if (eDevolucao) {
-        // Ignora devoluções com valor zero ou menor/igual a zero no contador
-        if (Math.abs(vPrecoTotalProd) > 0) {
-          totalDevolucaoGeral += Math.abs(vPrecoTotalProd);
-          qtdeDevolucoes++;
-        }
-        return; 
-      }
-
-      // Ignora O.S. de vendas normais com valor bruto/líquido menor ou igual a zero no contador e totais
-      if (vBruto <= 0 && vLiquido <= 0) {
-        return;
-      }
-
-      totalBrutoGeral += vBruto;
-      totalDescontoGeral += vDesconto;
-
-      if (vLiquido > 0 || vBruto > 0) {
+      if (venda.liquidoVendaGlobal > 0) {
         qtdeVendasNormais++;
       }
-    });
+      return;
+    }
+
+    // 3. Vendas Normais
+    totalBrutoGeral += venda.valorBrutoOS;
+
+    let descontoEfetivo = venda.somaDescontoItens;
+    if (venda.descontoVendaGlobal > descontoEfetivo) {
+      descontoEfetivo = venda.descontoVendaGlobal;
+    }
+
+    totalDescontoGeral += descontoEfetivo;
+
+    // Apenas conta se o valor líquido da venda for maior que zero
+    if (venda.liquidoVendaGlobal > 0) {
+      qtdeVendasNormais++;
+    }
   });
 
-  // Valor Líquido = Bruto - Desconto - Devolução
-  let totalLiquidoGeral = totalBrutoGeral - totalDescontoGeral - totalDevolucaoGeral;
+  console.log(`📊 TOTAIS FINAIS -> Bruto: ${totalBrutoGeral} | Desconto: ${totalDescontoGeral} | Devolução: ${totalDevolucaoGeral} | Qtd Vendas: ${qtdeVendasNormais}`);
+  console.groupEnd();
 
-  // Quantidade total líquida de O.S. (Vendas normais menos as devoluções)
+  let totalLiquidoGeral = totalBrutoGeral - totalDescontoGeral - totalDevolucaoGeral;
   let qtdeVendasGeral = qtdeVendasNormais - qtdeDevolucoes;
   if (qtdeVendasGeral < 0) qtdeVendasGeral = 0;
 
-  // Atualiza os cards na tela
   document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);
   document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);
   document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoGeral);
@@ -201,7 +201,7 @@ function renderizarGridTodosCampos(dados) {
   if (lojasDigitadas) {
     const idsFiltro = lojasDigitadas.split(",").map(id => id.trim());
     dadosFiltrados = dados.filter(item => {
-      const textoLojaCompleto = String(item.LOJANOME ?? item.CODIGOLOJA ?? item.LOJA ?? item.loja ?? item.IdLoja ?? "").trim();
+      const textoLojaCompleto = String(item.LOJANOME ?? item.CODIGOLOJA ?? item.LOJA ?? "").trim();
       const matchCodigo = textoLojaCompleto.match(/^0*(\d+)/);
       const codigoExtraido = matchCodigo ? matchCodigo[1] : textoLojaCompleto;
       const codigoSemZeroEsquerda = matchCodigo ? String(parseInt(matchCodigo[1], 10)) : codigoExtraido;
@@ -243,8 +243,9 @@ function renderizarGridTodosCampos(dados) {
       td.textContent = (valor === null || valor === undefined) ? "-" : valor;
       tr.appendChild(td);
 
-      if (COLUNAS_VALORES_TOTALIZAR.includes(coluna.toUpperCase())) {
-        totais[coluna.toUpperCase()] += parseNumeroBR(valor);
+      const colunaUpper = coluna.toUpperCase();
+      if (COLUNAS_VALORES_TOTALIZAR.includes(colunaUpper)) {
+        totais[colunaUpper] += parseNumeroBR(valor);
       }
     });
     tbody.appendChild(tr);
@@ -258,7 +259,7 @@ function renderizarGridTodosCampos(dados) {
     if (index === 0) {
       td.textContent = "TOTAL";
     } else if (COLUNAS_VALORES_TOTALIZAR.includes(colunaUpper)) {
-      if (colunaUpper === 'QUANTIDADETOTAL') {
+      if (colunaUpper === 'QUANTIDADE') {
         td.textContent = totais[colunaUpper].toLocaleString('pt-BR', { minimumFractionDigits: 2 });
       } else {
         td.textContent = formatarMoedaBR(totais[colunaUpper]);
