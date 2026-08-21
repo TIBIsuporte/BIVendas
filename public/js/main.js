@@ -187,62 +187,26 @@ function processarDadosBI(dados, dadosDevolucoes) {
     });
   }
 
-  const osMap = {};
+  // 1. Calculamos direto dos dados filtrados da grid (exatamente igual ao rodapé da tabela)
+  let totalBrutoGeral = 0;
+  let totalDescontoGeral = 0;
+  let totalLiquidoTabela = 0;
+  let qtdeVendasNormais = 0;
+  const osSet = new Set();
 
   dadosFiltrados.forEach(item => {
     const osId = String(item.OS || item.CODIGODAVENDA || "").trim();
-    if (!osId) return;
+    if (osId) osSet.add(osId);
 
-    if (!osMap[osId]) {
-      osMap[osId] = {
-        os: osId,
-        valorBrutoOS: 0,
-        somaDescontoItens: 0,
-        liquidoOS: 0,
-        descontoVendaGlobal: parseNumeroBR(item.DESCONTOVENDA),
-        liquidoVendaGlobal: parseNumeroBR(item.VLRLIQUIDOVENDA || item.VALORLIQUIDOPRODUTO || 0),
-        tipoVenda: String(item.TIPOVENDA || "").trim().toUpperCase()
-      };
-    }
-
-    osMap[osId].valorBrutoOS += parseNumeroBR(item.VALORBRUTOPRODUTO);
-    osMap[osId].somaDescontoItens += parseNumeroBR(item.DESCPRODUTO);
-    osMap[osId].liquidoOS += parseNumeroBR(item.LIQUIDOPRODUTO);
+    totalBrutoGeral += parseNumeroBR(item.VALORBRUTOPRODUTO);
+    totalDescontoGeral += parseNumeroBR(item.DESCPRODUTO);
+    totalLiquidoTabela += parseNumeroBR(item.LIQUIDOPRODUTO);
   });
 
-  let totalBrutoGeral = 0;
-  let totalDescontoGeral = 0;
-  let qtdeVendasNormais = 0;
-
-  Object.keys(osMap).forEach(osId => {
-    const venda = osMap[osId];
-
-    if (venda.tipoVenda === "TROCA") {
-      totalBrutoGeral += venda.valorBrutoOS;
-      if (venda.liquidoVendaGlobal > 0) qtdeVendasNormais++;
-      return;
-    }
-
-    totalBrutoGeral += venda.valorBrutoOS;
-
-    let descontoEfetivo = venda.somaDescontoItens;
-    if (venda.descontoVendaGlobal > descontoEfetivo) {
-      descontoEfetivo = venda.descontoVendaGlobal;
-    }
-
-    totalDescontoGeral += descontoEfetivo;
-
-    if (venda.liquidoVendaGlobal > 0) {
-      qtdeVendasNormais++;
-    }
-  });
-
-  // --- REGRA CORRETA: PROCESSAR DEVOLUÇÕES VINCULADAS ÀS O.S. ---
+  // 2. Calculamos a devolução real vindas da segunda API
   let totalDevolucaoGeral = 0;
-  
   if (Array.isArray(dadosDevolucoes) && dadosDevolucoes.length > 0) {
     dadosDevolucoes.forEach(itemDev => {
-      // Validação de loja
       const textoLojaDev = String(itemDev.LOJANOME ?? itemDev.CODIGOLOJA ?? itemDev.LOJA ?? "").trim();
       const matchDev = textoLojaDev.match(/^0*(\d+)/);
       const codDev = matchDev ? matchDev[1] : textoLojaDev;
@@ -259,28 +223,20 @@ function processarDadosBI(dados, dadosDevolucoes) {
     });
   }
 
-  // Cálculo matemático limpo e definitivo:
-  let totalLiquidoGeral = totalBrutoGeral - totalDescontoGeral - totalDevolucaoGeral;
-  let qtdeVendasGeral = qtdeVendasNormais;
+  // Se a segunda API porventura retornar zero ou não achar, mantemos limpo
+  // O líquido real abate a devolução do total líquido da tabela
+  let totalLiquidoFinal = totalLiquidoTabela - totalDevolucaoGeral;
+  let qtdeVendasGeral = osSet.size;
 
-  // --- LOG DE AUDITORIA NO F12 ---
-  console.log("----------------------------------------");
-  console.log("📊 AUDITORIA COM A REGRA DE O.S. CORRIGIDA:");
-  console.log("🔹 Bruto:", totalBrutoGeral);
-  console.log("🔹 Desconto:", totalDescontoGeral);
-  console.log("🔹 Devolução Calculada:", totalDevolucaoGeral);
-  console.log("🔹 Líquido Final Calculado:", totalLiquidoGeral);
-  console.log("----------------------------------------");
-
+  // Atualizando os Cards na ordem correta do seu HTML
   document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);
   document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);
-  document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoGeral);
+  document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoFinal);
   document.getElementById("cardDevolucao").textContent = formatarMoedaBR(totalDevolucaoGeral);
   document.getElementById("cardQtdeVendas").textContent = qtdeVendasGeral.toLocaleString('pt-BR');
 
   document.getElementById("biCardsContainer").style.display = "grid";
 }
-
 function renderizarGridTodosCampos(dados) {
   const thead = document.getElementById("cabecalhoTabela");
   const tbody = document.getElementById("corpoTabela");
