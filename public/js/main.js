@@ -1,8 +1,7 @@
-const SUPABASE_URL = 'https://cwmofpwuihrnifsvqhik.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_biWjIRo9x6maeZXcoKX6Lw_l-fjV0wP';
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const SUPABASE_URL = 'https://cwmofpwuihrnifsvqhik.supabase.co';[cite: 2]
+const SUPABASE_KEY = 'sb_publishable_biWjIRo9x6maeZXcoKX6Lw_l-fjV0wP';[cite: 2]
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);[cite: 2]
 
-// Colunas atualizadas para a nova estrutura baseada em itens por OS
 const COLUNAS_VALORES_TOTALIZAR = [
   'QUANTIDADE',
   'VALORBRUTOPRODUTO',
@@ -12,7 +11,7 @@ const COLUNAS_VALORES_TOTALIZAR = [
 ];
 
 window.onload = async () => {
-  await carregarLojasSupabase(supabaseClient);
+  await carregarLojasSupabase(supabaseClient);[cite: 2]
 };
 
 function formatarDataISOparaBR(dataISO) {
@@ -36,25 +35,38 @@ async function consultar() {
   document.getElementById("loadingOverlay").style.display = "flex";
   document.getElementById("resultado").innerHTML = "";
 
-  const body = {
-    DATAINICIAL: formatarDataISOparaBR(document.getElementById("dataInicial").value),
-    DATAFINAL: formatarDataISOparaBR(document.getElementById("dataFinal").value),
-    LOJAS: document.getElementById("lojas").value,
-    TIPODATA: document.getElementById("tipodata").value || "VENDA",
+  const dataInicialFmt = formatarDataISOparaBR(document.getElementById("dataInicial").value);
+  const dataFinalFmt = formatarDataISOparaBR(document.getElementById("dataFinal").value);
+  const lojasVal = document.getElementById("lojas").value;
+  const tipoDataVal = document.getElementById("tipodata").value || "VENDA";
+
+  const bodyReq = {
+    DATAINICIAL: dataInicialFmt,
+    DATAFINAL: dataFinalFmt,
+    LOJAS: lojasVal,
+    TIPODATA: tipoDataVal,
     TIPOVENDA: ""
   };
 
   try {
-    const response = await fetch("/consulta", {
+    // 1. Chamada Principal
+    const responsePrincipal = await fetch("/consulta", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
+      body: JSON.stringify(bodyReq)
     });
+    if (!responsePrincipal.ok) throw new Error("Erro na requisição principal: " + responsePrincipal.status);
+    const dadosBrutos = await responsePrincipal.json();
 
-    if (!response.ok) throw new Error("Erro na requisição: " + response.status);
+    // 2. Chamada Secundária (Exclusiva para Devoluções)
+    const responseDev = await fetch("/consulta-devolucoes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(bodyReq)
+    });
+    const dadosDevolucaoAPI = responseDev.ok ? await responseDev.json() : [];
 
-    const dadosBrutos = await response.json();
-    processarDadosBI(dadosBrutos);
+    processarDadosBI(dadosBrutos, dadosDevolucaoAPI);
     renderizarGridTodosCampos(dadosBrutos);
   } catch (error) {
     document.getElementById("resultado").innerHTML = "<p class='erro'>" + error.message + "</p>";
@@ -64,7 +76,7 @@ async function consultar() {
   }
 }
 
-function processarDadosBI(dados) {
+function processarDadosBI(dados, dadosDevolucaoAPI) {
   if (!dados || dados.length === 0) {
     document.getElementById("biCardsContainer").style.display = "none";
     return;
@@ -87,7 +99,6 @@ function processarDadosBI(dados) {
     });
   }
 
-  // AGRUPAMENTO POR O.S. (Garante que somamos os itens da O.S. antes de avaliar as regras)
   const osMap = {};
 
   dadosFiltrados.forEach(item => {
@@ -118,12 +129,22 @@ function processarDadosBI(dados) {
   let qtdeVendasNormais = 0;
   let qtdeDevolucoes = 0;
 
-  console.group("🔍 LOG DE PROCESSAMENTO (POR O.S.)");
+  console.group("🔍 LOG DE PROCESSAMENTO (COM 2ª API DE DEVOLUÇÕES)");
 
+  // 1. Abastecendo com a segunda API (Usando PRECOTOTALPRODUTO)
+  if (dadosDevolucaoAPI && Array.isArray(dadosDevolucaoAPI)) {
+    dadosDevolucaoAPI.forEach(itemDev => {
+      const valorDevItem = parseNumeroBR(itemDev.PRECOTOTALPRODUTO || itemDev.VALORBRUTO || 0);
+      const valorAbs = Math.abs(valorDevItem);
+      totalDevolucaoGeral += valorAbs;
+      qtdeDevolucoes++;
+    });
+  }
+
+  // 2. Processando o mapa da API principal
   Object.keys(osMap).forEach(osId => {
     const venda = osMap[osId];
     
-    // 1. Devolução Real
     const eDevolucaoReal = venda.ehDevolucaoFlag && (venda.tipoVenda === "DEVOLUCAO" || venda.tipoVenda.includes("DEV"));
 
     if (eDevolucaoReal) {
@@ -133,7 +154,6 @@ function processarDadosBI(dados) {
       return;
     }
 
-    // 2. Troca (DESCONTOVENDA vai para Devolução)
     if (venda.tipoVenda === "TROCA") {
       const valorDevolucaoTroca = venda.descontoVendaGlobal;
       totalDevolucaoGeral += valorDevolucaoTroca;
@@ -146,7 +166,6 @@ function processarDadosBI(dados) {
       return;
     }
 
-    // 3. Vendas Normais
     totalBrutoGeral += venda.valorBrutoOS;
 
     let descontoEfetivo = venda.somaDescontoItens;
@@ -156,7 +175,6 @@ function processarDadosBI(dados) {
 
     totalDescontoGeral += descontoEfetivo;
 
-    // Apenas conta se o valor líquido da venda for maior que zero
     if (venda.liquidoVendaGlobal > 0) {
       qtdeVendasNormais++;
     }
@@ -179,6 +197,7 @@ function processarDadosBI(dados) {
 }
 
 function renderizarGridTodosCampos(dados) {
+  // Mantém a renderização original da tabela[cite: 2]
   const thead = document.getElementById("cabecalhoTabela");
   const tbody = document.getElementById("corpoTabela");
   const tfoot = document.getElementById("rodapeTabela");
@@ -220,7 +239,6 @@ function renderizarGridTodosCampos(dados) {
   }
 
   labelTotal.textContent = `${dadosFiltrados.length.toLocaleString('pt-BR')} registros encontrados`;
-
   const colunas = Object.keys(dadosFiltrados[0]);
 
   let trHead = document.createElement("tr");
@@ -239,7 +257,6 @@ function renderizarGridTodosCampos(dados) {
     colunas.forEach(coluna => {
       let td = document.createElement("td");
       let valor = item[coluna];
-
       td.textContent = (valor === null || valor === undefined) ? "-" : valor;
       tr.appendChild(td);
 
