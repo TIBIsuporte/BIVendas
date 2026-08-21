@@ -87,7 +87,6 @@ function processarDadosBI(dados) {
     });
   }
 
-  // Agrupamento estrito por OS (chave única)
   const osMap = {};
 
   dadosFiltrados.forEach(item => {
@@ -96,19 +95,21 @@ function processarDadosBI(dados) {
 
     if (!osMap[osId]) {
       osMap[osId] = {
+        os: osId,
         valorBrutoOS: 0,
         somaDescontoItens: 0,
         liquidoOS: 0,
-        // O DESCONTOVENDA vem repetido em todas as linhas da mesma OS, guardamos apenas uma vez
         descontoVendaGlobal: parseNumeroBR(item.DESCONTOVENDA),
         ehDevolucaoFlag: String(item.EHDEVOLUCAO || "").trim().toUpperCase() === "D",
-        tipoVenda: String(item.TIPOVENDA || "").trim().toUpperCase()
+        tipoVenda: String(item.TIPOVENDA || "").trim().toUpperCase(),
+        itens: []
       };
     }
 
     osMap[osId].valorBrutoOS += parseNumeroBR(item.VALORBRUTOPRODUTO);
     osMap[osId].somaDescontoItens += parseNumeroBR(item.DESCPRODUTO);
     osMap[osId].liquidoOS += parseNumeroBR(item.LIQUIDOPRODUTO);
+    osMap[osId].itens.push(item);
   });
 
   let totalBrutoGeral = 0;
@@ -117,31 +118,32 @@ function processarDadosBI(dados) {
   let qtdeVendasNormais = 0;
   let qtdeDevolucoes = 0;
 
+  console.group("🔍 LOG DE PROCESSAMENTO DE O.S. (BI)");
+
   Object.keys(osMap).forEach(osId => {
     const venda = osMap[osId];
     
-    // Devolução real apenas se EHDEVOLUCAO for "D" ou estorno explícito
+    // Verificação detalhada de devolução
     const eDevolucao = venda.ehDevolucaoFlag || 
-                       (venda.tipoVenda.includes("DEV") && !venda.tipoVenda.includes("TROCA")) || 
+                       venda.tipoVenda.includes("DEV") || 
                        venda.tipoVenda.includes("ESTORNO") || 
                        venda.liquidoOS < 0;
 
+    // Vamos logar especificamente se cair em devolução ou se for a OS 44675
+    if (eDevolucao || osId === "44675") {
+      console.log(`OS: ${osId} | TipoVenda: "${venda.tipoVenda}" | EhDevolucaoFlag: ${venda.ehDevolucaoFlag} | Classificado como Devolução?: ${eDevolucao} | LíquidoOS: ${venda.liquidoOS} | Bruto: ${venda.valorBrutoOS} | DescontoGlobal: ${venda.descontoVendaGlobal}`);
+    }
+
     if (eDevolucao) {
-      totalDevolucaoGeral += Math.abs(venda.liquidoOS > 0 ? venda.liquidoOS : venda.valorBrutoOS);
+      const valorDev = Math.abs(venda.liquidoOS > 0 ? venda.liquidoOS : venda.valorBrutoOS);
+      totalDevolucaoGeral += valorDev;
       qtdeDevolucoes++;
       return;
     }
 
     totalBrutoGeral += venda.valorBrutoOS;
 
-    // Regra de Ouro para o Desconto: 
-    // Se a soma dos descontos dos itens cobrir o valor, usa ela. 
-    // Se o desconto estiver centralizado no campo global DESCONTOVENDA da OS, usa o global.
     let descontoEfetivo = venda.somaDescontoItens;
-    if (descontoEfetivo === 0 && venda.descontoVendaGlobal > 0) {
-      descontoEfetivo = venda.descontoVendaGlobal;
-    }
-    // Caso especial onde o desconto global da OS (ex: 1300) prevalece sobre a soma quebrada dos itens
     if (venda.descontoVendaGlobal > descontoEfetivo) {
       descontoEfetivo = venda.descontoVendaGlobal;
     }
@@ -150,11 +152,13 @@ function processarDadosBI(dados) {
     qtdeVendasNormais++;
   });
 
+  console.log(`📊 TOTAIS -> Bruto: ${totalBrutoGeral} | Desconto: ${totalDescontoGeral} | Devolução: ${totalDevolucaoGeral}`);
+  console.groupEnd();
+
   let totalLiquidoGeral = totalBrutoGeral - totalDescontoGeral - totalDevolucaoGeral;
   let qtdeVendasGeral = qtdeVendasNormais - qtdeDevolucoes;
   if (qtdeVendasGeral < 0) qtdeVendasGeral = 0;
 
-  // Atualiza os cards na tela
   document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);
   document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);
   document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoGeral);
