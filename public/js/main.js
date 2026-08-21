@@ -237,7 +237,7 @@ function processarDadosBI(dados, dadosDevolucoes) {
     }
   });
 
-  // Cálculo dinâmico puro das devoluções
+// Cálculo dinâmico puro
   let totalDevolucaoGeral = 0;
   if (Array.isArray(dadosDevolucoes) && dadosDevolucoes.length > 0) {
     dadosDevolucoes.forEach(itemDev => {
@@ -257,24 +257,25 @@ function processarDadosBI(dados, dadosDevolucoes) {
     });
   }
 
-  // Cálculo dinâmico e matemático oficial: Bruto - Desconto - Devolução
+  // O líquido real é o Bruto menos o Desconto menos a Devolução
   let totalLiquidoGeral = totalBrutoGeral - totalDescontoGeral - totalDevolucaoGeral;
   let qtdeVendasGeral = qtdeVendasNormais;
 
-  // --- LOGS DE INSPEÇÃO NO CONSOLE (F12) ---
-  console.group("🔍 [DEBUG BI] - Cálculo Dinâmico");
-  console.log("Total Bruto Geral:", totalBrutoGeral);
-  console.log("Total Desconto Geral:", totalDescontoGeral);
-  console.log("Total Devolução Calculado:", totalDevolucaoGeral);
-  console.log("Total Líquido Calculado:", totalLiquidoGeral);
-  console.log("Quantidade de Vendas:", qtdeVendasGeral);
-  console.groupEnd();
-  // ----------------------------------------
+  // --- LOG DETALHADO NO FINAL PARA AUDITORIA (APERTE F12) ---
+  console.log("----------------------------------------");
+  console.log("📊 AUDITORIA FINAL DE CÁLCULOS DO BI:");
+  console.log("🔹 Valor Bruto Geral:", totalBrutoGeral);
+  console.log("🔹 Total Desconto:", totalDescontoGeral);
+  console.log("🔹 Total Devolução Calculado:", totalDevolucaoGeral);
+  console.log("🔹 Subtotal (Bruto - Desconto):", (totalBrutoGeral - totalDescontoGeral));
+  console.log("🔹 Valor Líquido Final (Subtotal - Devolução):", totalLiquidoGeral);
+  console.log("----------------------------------------");
 
+  // ATRIBUINDO AOS ELEMENTOS HTML CORRETOS (GARANTINDO A ORDEM EXATA)
   document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);
   document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);
-  document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoGeral);
-  document.getElementById("cardDevolucao").textContent = formatarMoedaBR(totalDevolucaoGeral);
+  document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoGeral); // Aqui vai o líquido certo (~40.122,25)
+  document.getElementById("cardDevolucao").textContent = formatarMoedaBR(totalDevolucaoGeral);       // Aqui vai a devolução certa (~1.241,25)
   document.getElementById("cardQtdeVendas").textContent = qtdeVendasGeral.toLocaleString('pt-BR');
 
   document.getElementById("biCardsContainer").style.display = "grid";
