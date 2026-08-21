@@ -6,15 +6,13 @@ const app = express();
 app.use(express.json({ limit: "10mb" }));
 app.use(cors());
 
-// Serve os arquivos estáticos da pasta public (index.html, css, js)
+// Serve os arquivos estáticos da pasta public
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Rota raiz para carregar a página principal
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Rota de consulta protegida: O servidor gerencia o Token/Auth de forma segura
 app.post("/consulta", async (req, res) => {
   const body = {
     DATAINICIAL: req.body.DATAINICIAL || "",
@@ -24,14 +22,13 @@ app.post("/consulta", async (req, res) => {
     TIPOVENDA: req.body.TIPOVENDA || ""
   };
 
-  console.log("Processando requisição de relatório no servidor...");
+  console.log("Processando requisição de relatório ProdutosPorOSGrid no servidor...");
 
   try {
-    const response = await fetch("https://api.savwinweb.com.br/api/APIRelatoriosCR/ProdutosPorOS", {
+    const response = await fetch("https://api.savwinweb.com.br/api/APIRelatoriosCR/ProdutosPorOSGrid", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        // Credenciais e tokens protegidos e confidenciais restritos ao back-end
         "Authorization": "Bearer 4AE83C98E8315579579F297C8F8BDE2C6ACF269E57D85DD37EF2647DCA77733",
         "Identificador": "09983-0000"
       },
