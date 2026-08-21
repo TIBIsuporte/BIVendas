@@ -201,15 +201,21 @@ function processarDadosBI(dados, dadosDevolucoes) {
     totalLiquidoTabela += parseNumeroBR(item.LIQUIDOPRODUTO);
   });
 
-  // --- LOG E INSPEÇÃO DA SEGUNDA API (DEVOLUÇÕES / TROCAS) ---
-  console.group("🔄 [INSPEÇÃO DA SEGUNDA API - DEVOLUÇÕES/TROCAS]");
-  console.log("Dados brutos recebidos de /consultadevolucoes:", dadosDevolucoes);
+  // --- PROCESSAMENTO DE DEVOLUÇÕES / TROCAS COM FILTRO RIGOROSO ---
+  console.group("🔄 [INSPEÇÃO DE DEVOLUÇÕES/TROCAS]");
+  console.log("Total de registros recebidos na API de Devoluções:", dadosDevolucoes?.length || 0);
 
   let totalDevolucaoGeral = 0;
-  let amostraDevolucoes = [];
 
   if (Array.isArray(dadosDevolucoes) && dadosDevolucoes.length > 0) {
-    dadosDevolucoes.forEach((itemDev, index) => {
+    dadosDevolucoes.forEach(itemDev => {
+      // Filtro rigoroso: Ignora imediatamente se o tipo de venda não for "TROCA"
+      const tipoVendaDev = String(itemDev.TIPOVENDA || itemDev.TIPO || "").trim().toUpperCase();
+      if (tipoVendaDev !== "TROCA") {
+        return; 
+      }
+
+      // Validar a Loja
       const textoLojaDev = String(itemDev.LOJANOME ?? itemDev.CODIGOLOJA ?? itemDev.LOJA ?? "").trim();
       const matchDev = textoLojaDev.match(/^0*(\d+)/);
       const codDev = matchDev ? matchDev[1] : textoLojaDev;
@@ -220,27 +226,19 @@ function processarDadosBI(dados, dadosDevolucoes) {
         lojasDigitadas.split(",").map(id => id.trim()).includes(codDevSemZero) ||
         lojasDigitadas.split(",").map(id => id.trim().toLowerCase()).some(id => textoLojaDev.toLowerCase().includes(id));
 
-      const valorDevolucaoItem = parseNumeroBR(itemDev.PRECOTOTALPRODUTO || itemDev.VALORBRUTOPRODUTO || itemDev.LIQUIDOPRODUTO || 0);
-
-      if (atendeLoja) {
-        totalDevolucaoGeral += valorDevolucaoItem;
+      if (!atendeLoja) {
+        return;
       }
 
-      if (index < 5) {
-        amostraDevolucoes.push({
-          itemOriginal: itemDev,
-          lojaExtraida: codDev,
-          atendeFiltroLoja: atendeLoja,
-          valorSomado: valorDevolucaoItem
-        });
-      }
+      // Somar o valor correspondente da troca
+      const valorDevolucaoItem = parseNumeroBR(itemDev.LIQUIDOPRODUTO || itemDev.VALORBRUTOPRODUTO || itemDev.PRECOTOTALPRODUTO || 0);
+      totalDevolucaoGeral += valorDevolucaoItem;
     });
   }
 
-  console.log("Amostra dos primeiros itens processados na Devolução:", amostraDevolucoes);
-  console.log("Total Geral Calculado de Devoluções:", totalDevolucaoGeral);
+  console.log("Total Geral Calculado Apenas para Devoluções do tipo 'TROCA':", totalDevolucaoGeral);
   console.groupEnd();
-  // -----------------------------------------------------------
+  // ----------------------------------------------------------------
 
   let totalLiquidoFinal = totalLiquidoTabela - totalDevolucaoGeral;
   let qtdeVendasGeral = osSet.size;
@@ -310,6 +308,8 @@ function renderizarGridTodosCampos(dados) {
   const totais = {};
   COLUNAS_VALORES_TOTALIZAR.forEach(col => totais[col] = 0);
 
+  // --- LOG DETALHADO DE INSPEÇÃO DA TABELA ---
+  console.group("📋 [INSPEÇÃO DE COLUNAS E TOTALIZAÇÃO DA TABELA]");
   dadosFiltrados.forEach((item, index) => {
     let tr = document.createElement("tr");
     colunas.forEach(coluna => {
@@ -327,6 +327,9 @@ function renderizarGridTodosCampos(dados) {
     });
     tbody.appendChild(tr);
   });
+  console.log("Valores Finais Somados por Variável na Tabela:", totais);
+  console.groupEnd();
+  // -------------------------------------------
 
   let trFoot = document.createElement("tr");
   colunas.forEach((coluna, index) => {
