@@ -187,11 +187,9 @@ function processarDadosBI(dados, dadosDevolucoes) {
     });
   }
 
-  // 1. Calculamos direto dos dados filtrados da grid (exatamente igual ao rodapé da tabela)
   let totalBrutoGeral = 0;
   let totalDescontoGeral = 0;
   let totalLiquidoTabela = 0;
-  let qtdeVendasNormais = 0;
   const osSet = new Set();
 
   dadosFiltrados.forEach(item => {
@@ -203,7 +201,6 @@ function processarDadosBI(dados, dadosDevolucoes) {
     totalLiquidoTabela += parseNumeroBR(item.LIQUIDOPRODUTO);
   });
 
-  // 2. Calculamos a devolução real vindas da segunda API
   let totalDevolucaoGeral = 0;
   if (Array.isArray(dadosDevolucoes) && dadosDevolucoes.length > 0) {
     dadosDevolucoes.forEach(itemDev => {
@@ -223,12 +220,9 @@ function processarDadosBI(dados, dadosDevolucoes) {
     });
   }
 
-  // Se a segunda API porventura retornar zero ou não achar, mantemos limpo
-  // O líquido real abate a devolução do total líquido da tabela
   let totalLiquidoFinal = totalLiquidoTabela - totalDevolucaoGeral;
   let qtdeVendasGeral = osSet.size;
 
-  // Atualizando os Cards na ordem correta do seu HTML
   document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);
   document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);
   document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoFinal);
@@ -237,6 +231,7 @@ function processarDadosBI(dados, dadosDevolucoes) {
 
   document.getElementById("biCardsContainer").style.display = "grid";
 }
+
 function renderizarGridTodosCampos(dados) {
   const thead = document.getElementById("cabecalhoTabela");
   const tbody = document.getElementById("corpoTabela");
@@ -293,7 +288,14 @@ function renderizarGridTodosCampos(dados) {
   const totais = {};
   COLUNAS_VALORES_TOTALIZAR.forEach(col => totais[col] = 0);
 
-  dadosFiltrados.forEach(item => {
+  // --- LOG DETALHADO DE INSPEÇÃO DA TOTALIZAÇÃO ---
+  console.group("📋 [INSPEÇÃO DE COLUNAS E TOTALIZAÇÃO DA TABELA]");
+  console.log("Variáveis/Colunas configuradas para totalizar:", COLUNAS_VALORES_TOTALIZAR);
+  
+  const amostraValoresColunas = {};
+  COLUNAS_VALORES_TOTALIZAR.forEach(col => amostraValoresColunas[col] = []);
+
+  dadosFiltrados.forEach((item, index) => {
     let tr = document.createElement("tr");
     colunas.forEach(coluna => {
       let td = document.createElement("td");
@@ -304,11 +306,21 @@ function renderizarGridTodosCampos(dados) {
 
       const colunaUpper = coluna.toUpperCase();
       if (COLUNAS_VALORES_TOTALIZAR.includes(colunaUpper)) {
-        totais[colunaUpper] += parseNumeroBR(valor);
+        const numParsed = parseNumeroBR(valor);
+        totais[colunaUpper] += numParsed;
+        
+        if (index < 5) {
+          amostraValoresColunas[colunaUpper].push({ campo: colunaUpper, valorBruto: valor, valorConvertido: numParsed });
+        }
       }
     });
     tbody.appendChild(tr);
   });
+
+  console.log("Amostra dos valores lidos nas primeiras 5 linhas por campo:", amostraValoresColunas);
+  console.log("Valores Finais Somados por Variável:", totais);
+  console.groupEnd();
+  // ------------------------------------------------
 
   let trFoot = document.createElement("tr");
   colunas.forEach((coluna, index) => {
