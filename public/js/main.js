@@ -69,9 +69,6 @@ function processarDadosBI(dados) {
     return;
   }
 
-  // DEBUG: Abre o console do navegador (F12) para inspecionar os dados retornados pela API
-  console.log("=== DADOS RECEBIDOS DA API ===", dados);
-
   const lojasDigitadas = document.getElementById("lojas").value.trim();
   let dadosFiltrados = dados;
 
@@ -96,9 +93,6 @@ function processarDadosBI(dados) {
     const osId = item.CODIGODAVENDA;
     const tipoVenda = String(item.TIPOVENDA || "").trim().toUpperCase();
 
-    // DEBUG individual por O.S./Item no console
-    console.log(`O.S: ${osId} | Tipo Venda: '${tipoVenda}' | Eh Devolucao: '${item.EHDEVOLUCAO}' | Valor Líquido: ${item.VALORLIQUIDOTOTALVENDA}`);
-
     if (!lojasMap[lojaNome]) {
       lojasMap[lojaNome] = {};
     }
@@ -115,7 +109,7 @@ function processarDadosBI(dados) {
 
     lojasMap[lojaNome][osId].VALORBRUTO += parseNumeroBR(item.VALORBRUTO);
     lojasMap[lojaNome][osId].DESCONTOVALORPRODUTO += parseNumeroBR(item.DESCONTOVALORPRODUTO);
-    lojasMap[lojaNome][osId].VALORLIQUIDOTOTALVENDA = parseNumeroBR(item.VALORLIQUIDOTOTALVENDA);
+    lojasMap[lojaNome][osId].VALORLIQUIDOTOTALVENDA += parseNumeroBR(item.VALORLIQUIDOTOTALVENDA);
   });
 
   let totalBrutoGeral = 0;
@@ -137,12 +131,12 @@ function processarDadosBI(dados) {
       const tVenda = venda.TIPOVENDA;
       const ehDev = venda.EHDEVOLUCAO;
       
-      // Validação ampliada para capturar variações de devolução e valores negativos
-      const eDevolucao = tVenda.includes("DEV") || tVenda.includes("ESTORNO") || ehDev === "S" || ehDev === "SIM" || vLiquido < 0;
+      // Identifica se é devolução pelo TIPOVENDA, flag ou se os valores são negativos
+      const eDevolucao = tVenda.includes("DEV") || tVenda.includes("ESTORNO") || ehDev === "S" || ehDev === "SIM" || vBruto < 0 || vLiquido < 0;
 
       if (eDevolucao) {
-        totalDevolucaoGeral += Math.abs(vLiquido);
-        console.log(`-> O.S. ${os} CLASSIFICADA COMO DEVOLUÇÃO. Valor Absoluto: ${Math.abs(vLiquido)}`);
+        // Como o valor bruto da devolução vem negativo (-), usamos Math.abs para somar positivo no card de devolução
+        totalDevolucaoGeral += Math.abs(vBruto);
         return; 
       }
 
@@ -165,7 +159,6 @@ function processarDadosBI(dados) {
 
   document.getElementById("biCardsContainer").style.display = "grid";
 }
-
 function renderizarGridTodosCampos(dados) {
   const thead = document.getElementById("cabecalhoTabela");
   const tbody = document.getElementById("corpoTabela");
