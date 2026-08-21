@@ -100,17 +100,14 @@ function processarDadosBI(dados) {
         somaDescontoItens: 0,
         liquidoOS: 0,
         descontoVendaGlobal: parseNumeroBR(item.DESCONTOVENDA),
-        // Captura estritamente se o campo for "D"
         ehDevolucaoFlag: String(item.EHDEVOLUCAO || "").trim().toUpperCase() === "D",
-        tipoVenda: String(item.TIPOVENDA || "").trim().toUpperCase(),
-        itens: []
+        tipoVenda: String(item.TIPOVENDA || "").trim().toUpperCase()
       };
     }
 
     osMap[osId].valorBrutoOS += parseNumeroBR(item.VALORBRUTOPRODUTO);
     osMap[osId].somaDescontoItens += parseNumeroBR(item.DESCPRODUTO);
     osMap[osId].liquidoOS += parseNumeroBR(item.LIQUIDOPRODUTO);
-    osMap[osId].itens.push(item);
   });
 
   let totalBrutoGeral = 0;
@@ -119,21 +116,15 @@ function processarDadosBI(dados) {
   let qtdeVendasNormais = 0;
   let qtdeDevolucoes = 0;
 
-  console.group("🔍 LOG DE PROCESSAMENTO DE O.S. (BI - BLINDADO)");
+  console.group("🔍 LOG DE PROCESSAMENTO (TIPOVENDA = TROCA)");
 
   Object.keys(osMap).forEach(osId => {
     const venda = osMap[osId];
     
-    // REGRA BLINDADA: Devolução apenas se EHDEVOLUCAO for exatamente "D" 
-    // OU se o tipo de venda disser explicitamente respeito a estorno/devolução (excluindo promoções)
-    const tipoEhEstornoOuDev = venda.tipoVenda === "DEVOLUCAO" || 
-                               venda.tipoVenda.includes("ESTORNO") || 
-                               venda.tipoVenda.includes("DEV.");
-
-    const eDevolucao = venda.ehDevolucaoFlag || tipoEhEstornoOuDev;
+    // Devolução real estrita (evita falsos positivos como "MEU 1º 50%")
+    const eDevolucao = venda.ehDevolucaoFlag && (venda.tipoVenda === "DEVOLUCAO" || venda.tipoVenda.includes("DEV"));
 
     if (eDevolucao) {
-      console.log(`🚨 DEVOLUÇÃO REAL DETECTADA -> OS: ${osId} | TipoVenda: "${venda.tipoVenda}" | EhDevolucaoFlag: ${venda.ehDevolucaoFlag}`);
       const valorDev = Math.abs(venda.liquidoOS > 0 ? venda.liquidoOS : venda.valorBrutoOS);
       totalDevolucaoGeral += valorDev;
       qtdeDevolucoes++;
@@ -142,16 +133,24 @@ function processarDadosBI(dados) {
 
     totalBrutoGeral += venda.valorBrutoOS;
 
-    let descontoEfetivo = venda.somaDescontoItens;
-    if (venda.descontoVendaGlobal > descontoEfetivo) {
+    // APLICANDO A REGRA EXATA DO TIPOVENDA = "TROCA"
+    let descontoEfetivo = 0;
+
+    if (venda.tipoVenda === "TROCA") {
       descontoEfetivo = venda.descontoVendaGlobal;
+      console.log(`🔄 TROCA detectada na OS ${osId} -> Usando DESCONTOVENDA: ${descontoEfetivo}`);
+    } else {
+      descontoEfetivo = venda.somaDescontoItens;
+      if (venda.descontoVendaGlobal > descontoEfetivo) {
+        descontoEfetivo = venda.descontoVendaGlobal;
+      }
     }
 
     totalDescontoGeral += descontoEfetivo;
     qtdeVendasNormais++;
   });
 
-  console.log(`📊 TOTAIS CORRIGIDOS -> Bruto: ${totalBrutoGeral} | Desconto: ${totalDescontoGeral} | Devolução: ${totalDevolucaoGeral}`);
+  console.log(`📊 TOTAIS FINAIS -> Bruto: ${totalBrutoGeral} | Desconto: ${totalDescontoGeral} | Devolução: ${totalDevolucaoGeral}`);
   console.groupEnd();
 
   let totalLiquidoGeral = totalBrutoGeral - totalDescontoGeral - totalDevolucaoGeral;
