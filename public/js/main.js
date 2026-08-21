@@ -87,7 +87,7 @@ function processarDadosBI(dados) {
     });
   }
 
-  // Agrupamento por OS para consolidar os itens corretamente
+  // Agrupamento estrito por OS (chave única)
   const osMap = {};
 
   dadosFiltrados.forEach(item => {
@@ -97,9 +97,9 @@ function processarDadosBI(dados) {
     if (!osMap[osId]) {
       osMap[osId] = {
         valorBrutoOS: 0,
-        descontoOS: 0,
+        somaDescontoItens: 0,
         liquidoOS: 0,
-        // DESCONTOVENDA vem replicado por item, pegamos o valor da linha (ou máximo)
+        // O DESCONTOVENDA vem repetido em todas as linhas da mesma OS, guardamos apenas uma vez
         descontoVendaGlobal: parseNumeroBR(item.DESCONTOVENDA),
         ehDevolucaoFlag: String(item.EHDEVOLUCAO || "").trim().toUpperCase() === "D",
         tipoVenda: String(item.TIPOVENDA || "").trim().toUpperCase()
@@ -107,7 +107,7 @@ function processarDadosBI(dados) {
     }
 
     osMap[osId].valorBrutoOS += parseNumeroBR(item.VALORBRUTOPRODUTO);
-    osMap[osId].descontoOS += parseNumeroBR(item.DESCPRODUTO);
+    osMap[osId].somaDescontoItens += parseNumeroBR(item.DESCPRODUTO);
     osMap[osId].liquidoOS += parseNumeroBR(item.LIQUIDOPRODUTO);
   });
 
@@ -120,8 +120,7 @@ function processarDadosBI(dados) {
   Object.keys(osMap).forEach(osId => {
     const venda = osMap[osId];
     
-    // Regra rigorosa de devolução: Apenas se EHDEVOLUCAO for "D" ou o tipo contiver explicitamente DEV/ESTORNO
-    // (TROCA agora é tratada como operação comercial normal, não entra aqui)
+    // Devolução real apenas se EHDEVOLUCAO for "D" ou estorno explícito
     const eDevolucao = venda.ehDevolucaoFlag || 
                        (venda.tipoVenda.includes("DEV") && !venda.tipoVenda.includes("TROCA")) || 
                        venda.tipoVenda.includes("ESTORNO") || 
@@ -134,11 +133,20 @@ function processarDadosBI(dados) {
     }
 
     totalBrutoGeral += venda.valorBrutoOS;
-    
-    // Se o desconto dos itens somado vier zerado mas houver DESCONTOVENDA na OS, podemos usar ele, senão somamos o dos itens
-    const descontoEfetivo = venda.descontoOS > 0 ? venda.descontoOS : venda.descontoVendaGlobal;
-    totalDescontoGeral += descontoEfetivo;
 
+    // Regra de Ouro para o Desconto: 
+    // Se a soma dos descontos dos itens cobrir o valor, usa ela. 
+    // Se o desconto estiver centralizado no campo global DESCONTOVENDA da OS, usa o global.
+    let descontoEfetivo = venda.somaDescontoItens;
+    if (descontoEfetivo === 0 && venda.descontoVendaGlobal > 0) {
+      descontoEfetivo = venda.descontoVendaGlobal;
+    }
+    // Caso especial onde o desconto global da OS (ex: 1300) prevalece sobre a soma quebrada dos itens
+    if (venda.descontoVendaGlobal > descontoEfetivo) {
+      descontoEfetivo = venda.descontoVendaGlobal;
+    }
+
+    totalDescontoGeral += descontoEfetivo;
     qtdeVendasNormais++;
   });
 
