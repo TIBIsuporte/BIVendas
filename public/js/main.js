@@ -11,92 +11,91 @@ const COLUNAS_VALORES_TOTALIZAR = [
   'CUSTO'
 ];
 
+let lojasDisponiveis = [];
+
 window.onload = async () => {
   await carregarLojasSupabase();
 };
 
-// --- FUNÇÕES DE SUPORTE A LOJAS (SUPABASE E MODAL) ---
+// --- FUNÇÕES DO MODAL DE LOJAS ---
 async function carregarLojasSupabase() {
   try {
     const { data, error } = await supabaseClient
-      .from('lojas') // Confirme se o nome da tabela no seu Supabase é 'lojas' ou ajuste aqui
-      .select('*')
-      .order('codigo', { ascending: true });
-
-    if (error) {
-      console.error("Erro ao buscar lojas do Supabase:", error.message);
-      return;
-    }
-
-    window.listaLojasGlobal = data || [];
-    renderizarListaLojasModal(window.listaLojasGlobal);
+      .from('lojas')
+      .select('id, nome, gerente')
+      .order('id', { ascending: true });
+    
+    if (error) throw error;
+    lojasDisponiveis = data || [];
   } catch (err) {
-    console.error("Erro inesperado ao carregar lojas:", err);
+    console.error("Erro ao carregar lojas do Supabase:", err.message);
   }
-}
-
-function renderizarListaLojasModal(lojas) {
-  const container = document.getElementById("listaLojasModal");
-  if (!container) return;
-  
-  container.innerHTML = "";
-
-  if (!lojas || lojas.length === 0) {
-    container.innerHTML = "<div style='padding: 10px; text-align: center;'>Nenhuma loja encontrada.</div>";
-    return;
-  }
-
-  lojas.forEach(loja => {
-    const div = document.createElement("div");
-    div.className = "modal-item-loja";
-    div.style.padding = "6px 8px";
-    div.style.borderBottom = "1px solid #eee";
-    div.style.display = "flex";
-    div.style.alignItems = "center";
-    div.style.gap = "10px";
-
-    const codigo = loja.codigo ?? loja.ID ?? loja.id ?? "";
-    const nome = loja.nome ?? loja.NOME ?? loja.razao_social ?? "";
-
-    div.innerHTML = `
-      <input type="checkbox" class="chk-loja-modal" value="${codigo}" style="width: auto;">
-      <span style="font-size: 13px;"><b>${codigo}</b> - ${nome}</span>
-    `;
-    container.appendChild(div);
-  });
 }
 
 function abrirModalLojas() {
+  const inputFiltro = document.getElementById("inputFiltroGerenteModal");
+  if (inputFiltro) inputFiltro.value = "";
+  renderizarListaLojasModal(lojasDisponiveis);
   const modal = document.getElementById("modalLojas");
   if (modal) modal.style.display = "flex";
 }
 
-function fecharModalLojas() {
-  const modal = document.getElementById("modalLojas");
-  if (modal) modal.style.display = "none";
+function renderizarListaLojasModal(lista) {
+  const container = document.getElementById("listaLojasModal");
+  if (!container) return;
+  container.innerHTML = "";
+  
+  const inputLojas = document.getElementById("lojas");
+  const idsAtuais = inputLojas ? inputLojas.value.split(",").map(s => s.trim()) : [];
+  const listaOrdenada = [...lista].sort((a, b) => Number(a.id) - Number(b.id));
+
+  listaOrdenada.forEach(loja => {
+    const checked = idsAtuais.includes(String(loja.id)) ? "checked" : "";
+    container.innerHTML += `
+      <label class="item-loja-modal" data-texto="[${loja.id}] ${loja.nome} ${loja.gerente || ''}" style="display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; border-bottom: 1px solid #eee; cursor: pointer;">
+        <div>
+          <input type="checkbox" value="${loja.id}" ${checked} style="width: auto; margin-right: 8px;"> 
+          <strong>[${loja.id}]</strong> ${loja.nome}
+        </div>
+        <span style="color: #666; font-size: 11px;">Gerente: ${loja.gerente || '-'}</span>
+      </label>
+    `;
+  });
 }
 
 function filtrarLojasNoModal() {
-  const termo = document.getElementById("inputFiltroGerenteModal").value.toLowerCase();
-  const filtradas = window.listaLojasGlobal.filter(l => {
-    const str = `${l.codigo} ${l.nome} ${l.gerente || ''}`.toLowerCase();
-    return str.includes(termo);
+  const termo = document.getElementById("inputFiltroGerenteModal").value.trim().toUpperCase();
+  const labels = document.querySelectorAll("#listaLojasModal .item-loja-modal");
+  labels.forEach(label => {
+    const texto = label.getAttribute("data-texto").toUpperCase();
+    label.style.display = (texto.includes(termo) || termo === "") ? "flex" : "none";
   });
-  renderizarListaLojasModal(filtradas);
+}
+
+function fecharModalLojas() { 
+  const modal = document.getElementById("modalLojas");
+  if (modal) modal.style.display = "none"; 
 }
 
 function toggleSelecionarTodasLojas(master) {
-  const checkboxes = document.querySelectorAll(".chk-loja-modal");
-  checkboxes.forEach(chk => chk.checked = master.checked);
+  document.querySelectorAll("#listaLojasModal .item-loja-modal").forEach(label => {
+    if (label.style.display !== "none") {
+      const cb = label.querySelector("input[type='checkbox']");
+      if (cb) cb.checked = master.checked;
+    }
+  });
 }
 
 function confirmarSelecaoLojas() {
-  const checkboxes = document.querySelectorAll(".chk-loja-modal:checked");
-  const selecionados = Array.from(checkboxes).map(chk => chk.value);
-  document.getElementById("lojas").value = selecionados.join(",");
+  const ids = [];
+  document.querySelectorAll("#listaLojasModal input[type='checkbox']").forEach(cb => { 
+    if (cb.checked) ids.push(cb.value); 
+  });
+  const inputLojas = document.getElementById("lojas");
+  if (inputLojas) inputLojas.value = ids.join(",");
   fecharModalLojas();
 }
-// ----------------------------------------------------
+// ---------------------------------
 
 function formatarDataISOparaBR(dataISO) {
   if (!dataISO) return "";
