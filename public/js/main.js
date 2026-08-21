@@ -201,7 +201,7 @@ function processarDadosBI(dados, dadosDevolucoes) {
     totalLiquidoTabela += parseNumeroBR(item.LIQUIDOPRODUTO);
   });
 
-// --- PROCESSAMENTO DE DEVOLUÇÕES / TROCAS COM FILTRO RIGOROSO ---
+  // --- PROCESSAMENTO DE DEVOLUÇÕES COM FILTRO RIGOROSO ---
   console.group("🔄 [INSPEÇÃO DE DEVOLUÇÕES]");
   console.log("Total de registros recebidos na API de Devoluções:", dadosDevolucoes?.length || 0);
 
@@ -209,15 +209,12 @@ function processarDadosBI(dados, dadosDevolucoes) {
 
   if (Array.isArray(dadosDevolucoes) && dadosDevolucoes.length > 0) {
     dadosDevolucoes.forEach(itemDev => {
-      // Filtro rigoroso: Verifica se o tipo de venda/operação é DEVOLUCAO
       const tipoVendaDev = String(itemDev.TIPOVENDA || itemDev.TIPO || "").trim().toUpperCase();
       
-      // Se não contiver "DEVOLUCAO", descarta na hora
       if (!tipoVendaDev.includes("DEVOLUCAO")) {
         return; 
       }
 
-      // Validar a Loja
       const textoLojaDev = String(itemDev.LOJANOME ?? itemDev.CODIGOLOJA ?? itemDev.LOJA ?? "").trim();
       const matchDev = textoLojaDev.match(/^0*(\d+)/);
       const codDev = matchDev ? matchDev[1] : textoLojaDev;
@@ -232,7 +229,6 @@ function processarDadosBI(dados, dadosDevolucoes) {
         return;
       }
 
-      // Somar o valor correspondente da devolução
       const valorDevolucaoItem = parseNumeroBR(itemDev.LIQUIDOPRODUTO || itemDev.VALORBRUTOPRODUTO || itemDev.PRECOTOTALPRODUTO || 0);
       totalDevolucaoGeral += valorDevolucaoItem;
     });
@@ -240,8 +236,9 @@ function processarDadosBI(dados, dadosDevolucoes) {
 
   console.log("Total Geral Calculado Apenas para Devoluções:", totalDevolucaoGeral);
   console.groupEnd();
-  // ----------------------------------------------------------------  // ----------------------------------------------------------------
+  // ----------------------------------------------------------------
 
+  // Valor Líquido Final subtraindo o valor da devolução
   let totalLiquidoFinal = totalLiquidoTabela - totalDevolucaoGeral;
   let qtdeVendasGeral = osSet.size;
 
@@ -310,7 +307,6 @@ function renderizarGridTodosCampos(dados) {
   const totais = {};
   COLUNAS_VALORES_TOTALIZAR.forEach(col => totais[col] = 0);
 
-  // --- LOG DETALHADO DE INSPEÇÃO DA TABELA ---
   console.group("📋 [INSPEÇÃO DE COLUNAS E TOTALIZAÇÃO DA TABELA]");
   dadosFiltrados.forEach((item, index) => {
     let tr = document.createElement("tr");
@@ -331,7 +327,6 @@ function renderizarGridTodosCampos(dados) {
   });
   console.log("Valores Finais Somados por Variável na Tabela:", totais);
   console.groupEnd();
-  // -------------------------------------------
 
   let trFoot = document.createElement("tr");
   colunas.forEach((coluna, index) => {
