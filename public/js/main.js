@@ -201,9 +201,15 @@ function processarDadosBI(dados, dadosDevolucoes) {
     totalLiquidoTabela += parseNumeroBR(item.LIQUIDOPRODUTO);
   });
 
+  // --- LOG E INSPEÇÃO DA SEGUNDA API (DEVOLUÇÕES / TROCAS) ---
+  console.group("🔄 [INSPEÇÃO DA SEGUNDA API - DEVOLUÇÕES/TROCAS]");
+  console.log("Dados brutos recebidos de /consultadevolucoes:", dadosDevolucoes);
+
   let totalDevolucaoGeral = 0;
+  let amostraDevolucoes = [];
+
   if (Array.isArray(dadosDevolucoes) && dadosDevolucoes.length > 0) {
-    dadosDevolucoes.forEach(itemDev => {
+    dadosDevolucoes.forEach((itemDev, index) => {
       const textoLojaDev = String(itemDev.LOJANOME ?? itemDev.CODIGOLOJA ?? itemDev.LOJA ?? "").trim();
       const matchDev = textoLojaDev.match(/^0*(\d+)/);
       const codDev = matchDev ? matchDev[1] : textoLojaDev;
@@ -214,11 +220,27 @@ function processarDadosBI(dados, dadosDevolucoes) {
         lojasDigitadas.split(",").map(id => id.trim()).includes(codDevSemZero) ||
         lojasDigitadas.split(",").map(id => id.trim().toLowerCase()).some(id => textoLojaDev.toLowerCase().includes(id));
 
+      const valorDevolucaoItem = parseNumeroBR(itemDev.PRECOTOTALPRODUTO || itemDev.VALORBRUTOPRODUTO || itemDev.LIQUIDOPRODUTO || 0);
+
       if (atendeLoja) {
-        totalDevolucaoGeral += parseNumeroBR(itemDev.PRECOTOTALPRODUTO || itemDev.VALORBRUTOPRODUTO || 0);
+        totalDevolucaoGeral += valorDevolucaoItem;
+      }
+
+      if (index < 5) {
+        amostraDevolucoes.push({
+          itemOriginal: itemDev,
+          lojaExtraida: codDev,
+          atendeFiltroLoja: atendeLoja,
+          valorSomado: valorDevolucaoItem
+        });
       }
     });
   }
+
+  console.log("Amostra dos primeiros itens processados na Devolução:", amostraDevolucoes);
+  console.log("Total Geral Calculado de Devoluções:", totalDevolucaoGeral);
+  console.groupEnd();
+  // -----------------------------------------------------------
 
   let totalLiquidoFinal = totalLiquidoTabela - totalDevolucaoGeral;
   let qtdeVendasGeral = osSet.size;
@@ -288,13 +310,6 @@ function renderizarGridTodosCampos(dados) {
   const totais = {};
   COLUNAS_VALORES_TOTALIZAR.forEach(col => totais[col] = 0);
 
-  // --- LOG DETALHADO DE INSPEÇÃO DA TOTALIZAÇÃO ---
-  console.group("📋 [INSPEÇÃO DE COLUNAS E TOTALIZAÇÃO DA TABELA]");
-  console.log("Variáveis/Colunas configuradas para totalizar:", COLUNAS_VALORES_TOTALIZAR);
-  
-  const amostraValoresColunas = {};
-  COLUNAS_VALORES_TOTALIZAR.forEach(col => amostraValoresColunas[col] = []);
-
   dadosFiltrados.forEach((item, index) => {
     let tr = document.createElement("tr");
     colunas.forEach(coluna => {
@@ -308,19 +323,10 @@ function renderizarGridTodosCampos(dados) {
       if (COLUNAS_VALORES_TOTALIZAR.includes(colunaUpper)) {
         const numParsed = parseNumeroBR(valor);
         totais[colunaUpper] += numParsed;
-        
-        if (index < 5) {
-          amostraValoresColunas[colunaUpper].push({ campo: colunaUpper, valorBruto: valor, valorConvertido: numParsed });
-        }
       }
     });
     tbody.appendChild(tr);
   });
-
-  console.log("Amostra dos valores lidos nas primeiras 5 linhas por campo:", amostraValoresColunas);
-  console.log("Valores Finais Somados por Variável:", totais);
-  console.groupEnd();
-  // ------------------------------------------------
 
   let trFoot = document.createElement("tr");
   colunas.forEach((coluna, index) => {
