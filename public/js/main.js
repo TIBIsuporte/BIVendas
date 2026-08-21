@@ -100,6 +100,7 @@ function processarDadosBI(dados) {
         somaDescontoItens: 0,
         liquidoOS: 0,
         descontoVendaGlobal: parseNumeroBR(item.DESCONTOVENDA),
+        // Captura estritamente se o campo for "D"
         ehDevolucaoFlag: String(item.EHDEVOLUCAO || "").trim().toUpperCase() === "D",
         tipoVenda: String(item.TIPOVENDA || "").trim().toUpperCase(),
         itens: []
@@ -118,23 +119,21 @@ function processarDadosBI(dados) {
   let qtdeVendasNormais = 0;
   let qtdeDevolucoes = 0;
 
-  console.group("🔍 LOG DE PROCESSAMENTO DE O.S. (BI)");
+  console.group("🔍 LOG DE PROCESSAMENTO DE O.S. (BI - BLINDADO)");
 
   Object.keys(osMap).forEach(osId => {
     const venda = osMap[osId];
     
-    // Verificação detalhada de devolução
-    const eDevolucao = venda.ehDevolucaoFlag || 
-                       venda.tipoVenda.includes("DEV") || 
-                       venda.tipoVenda.includes("ESTORNO") || 
-                       venda.liquidoOS < 0;
+    // REGRA BLINDADA: Devolução apenas se EHDEVOLUCAO for exatamente "D" 
+    // OU se o tipo de venda disser explicitamente respeito a estorno/devolução (excluindo promoções)
+    const tipoEhEstornoOuDev = venda.tipoVenda === "DEVOLUCAO" || 
+                               venda.tipoVenda.includes("ESTORNO") || 
+                               venda.tipoVenda.includes("DEV.");
 
-    // Vamos logar especificamente se cair em devolução ou se for a OS 44675
-    if (eDevolucao || osId === "44675") {
-      console.log(`OS: ${osId} | TipoVenda: "${venda.tipoVenda}" | EhDevolucaoFlag: ${venda.ehDevolucaoFlag} | Classificado como Devolução?: ${eDevolucao} | LíquidoOS: ${venda.liquidoOS} | Bruto: ${venda.valorBrutoOS} | DescontoGlobal: ${venda.descontoVendaGlobal}`);
-    }
+    const eDevolucao = venda.ehDevolucaoFlag || tipoEhEstornoOuDev;
 
     if (eDevolucao) {
+      console.log(`🚨 DEVOLUÇÃO REAL DETECTADA -> OS: ${osId} | TipoVenda: "${venda.tipoVenda}" | EhDevolucaoFlag: ${venda.ehDevolucaoFlag}`);
       const valorDev = Math.abs(venda.liquidoOS > 0 ? venda.liquidoOS : venda.valorBrutoOS);
       totalDevolucaoGeral += valorDev;
       qtdeDevolucoes++;
@@ -152,7 +151,7 @@ function processarDadosBI(dados) {
     qtdeVendasNormais++;
   });
 
-  console.log(`📊 TOTAIS -> Bruto: ${totalBrutoGeral} | Desconto: ${totalDescontoGeral} | Devolução: ${totalDevolucaoGeral}`);
+  console.log(`📊 TOTAIS CORRIGIDOS -> Bruto: ${totalBrutoGeral} | Desconto: ${totalDescontoGeral} | Devolução: ${totalDevolucaoGeral}`);
   console.groupEnd();
 
   let totalLiquidoGeral = totalBrutoGeral - totalDescontoGeral - totalDevolucaoGeral;
