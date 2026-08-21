@@ -91,7 +91,7 @@ function processarDadosBI(dados) {
 
   dadosFiltrados.forEach(item => {
     const lojaNome = item.LOJANOME || "LOJA GERAL";
-    const osId = item.CODIGODAVENDA;
+    const osId = String(item.CODIGODAVENDA || "").trim();
     const tipoVenda = String(item.TIPOVENDA || "").trim().toUpperCase();
 
     if (!lojasMap[lojaNome]) {
@@ -117,9 +117,10 @@ function processarDadosBI(dados) {
 
   let totalBrutoGeral = 0;
   let totalDescontoGeral = 0;
-  let totalLiquidoGeral = 0;
   let totalDevolucaoGeral = 0;
-  let qtdeVendasGeral = 0;
+  
+  let qtdeVendasNormais = 0;
+  let qtdeDevolucoes = 0;
 
   Object.keys(lojasMap).forEach(loja => {
     const ordensServico = lojasMap[loja];
@@ -135,23 +136,37 @@ function processarDadosBI(dados) {
       const tVenda = venda.TIPOVENDA;
       const ehDev = venda.EHDEVOLUCAO;
       
-      // Identifica se é devolução e acumula usando o PRECOTOTALPRODUTO transformado em positivo
       const eDevolucao = tVenda.includes("DEV") || tVenda.includes("ESTORNO") || ehDev === "S" || ehDev === "SIM" || vPrecoTotalProd < 0 || vLiquido < 0;
 
       if (eDevolucao) {
-        totalDevolucaoGeral += Math.abs(vPrecoTotalProd);
+        // Ignora devoluções com valor zero ou menor/igual a zero no contador
+        if (Math.abs(vPrecoTotalProd) > 0) {
+          totalDevolucaoGeral += Math.abs(vPrecoTotalProd);
+          qtdeDevolucoes++;
+        }
         return; 
+      }
+
+      // Ignora O.S. de vendas normais com valor bruto/líquido menor ou igual a zero no contador e totais
+      if (vBruto <= 0 && vLiquido <= 0) {
+        return;
       }
 
       totalBrutoGeral += vBruto;
       totalDescontoGeral += vDesconto;
-      totalLiquidoGeral += vLiquido;
 
-      if (vLiquido > 0) {
-        qtdeVendasGeral++;
+      if (vLiquido > 0 || vBruto > 0) {
+        qtdeVendasNormais++;
       }
     });
   });
+
+  // Valor Líquido = Bruto - Desconto - Devolução
+  let totalLiquidoGeral = totalBrutoGeral - totalDescontoGeral - totalDevolucaoGeral;
+
+  // Quantidade total líquida de O.S. (Vendas normais menos as devoluções)
+  let qtdeVendasGeral = qtdeVendasNormais - qtdeDevolucoes;
+  if (qtdeVendasGeral < 0) qtdeVendasGeral = 0;
 
   // Atualiza os cards na tela
   document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);
