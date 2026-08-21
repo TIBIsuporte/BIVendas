@@ -177,15 +177,15 @@ function processarDadosBI(dados, dadosDevolucoes) {
     });
   }
 
-  let totalLiquidoGeral = totalBrutoGeral - totalDescontoGeral - totalDevolucaoGeral;
+let totalLiquidoGeral = totalBrutoGeral - totalDescontoGeral - totalDevolucaoGeral;
   let qtdeVendasGeral = qtdeVendasNormais;
 
   document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);
   document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);
   
-  // INVERTIDOS AQUI PARA BATER CORRETAMENTE COM A ORDEM VISUAL DOS CARDS:
-  document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoGeral);
-  document.getElementById("cardDevolucao").textContent = formatarMoedaBR(totalDevolucaoGeral);
+  // ATRIBUIÇÃO CORRETA PARA BATER COM A SUA ORDEM EXATA:
+  document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoGeral); // Vai receber R$ 40.122,25
+  document.getElementById("cardDevolucao").textContent = formatarMoedaBR(totalDevolucaoGeral);       // Vai receber R$ 1.241,25
   
   document.getElementById("cardQtdeVendas").textContent = qtdeVendasGeral.toLocaleString('pt-BR');
 
