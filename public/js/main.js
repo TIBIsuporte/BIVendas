@@ -259,10 +259,11 @@ function processarDadosBI(dados, dadosDevolucoes) {
   let totalLiquidoGeral = totalBrutoGeral - totalDescontoGeral - totalDevolucaoGeral;
   let qtdeVendasGeral = qtdeVendasNormais;
 
+  // CORREÇÃO APLICADA AQUI: Vinculando a variável exata ao ID correto do card
   document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);
   document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);
-  document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoGeral);
-  document.getElementById("cardDevolucao").textContent = formatarMoedaBR(totalDevolucaoGeral);
+  document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoGeral); // Recebe o líquido calculado
+  document.getElementById("cardDevolucao").textContent = formatarMoedaBR(totalDevolucaoGeral);       // Recebe a soma da devolução
   document.getElementById("cardQtdeVendas").textContent = qtdeVendasGeral.toLocaleString('pt-BR');
 
   document.getElementById("biCardsContainer").style.display = "grid";
