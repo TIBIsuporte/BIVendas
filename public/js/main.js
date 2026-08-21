@@ -7,7 +7,8 @@ const COLUNAS_VALORES_TOTALIZAR = [
   'QUANTIDADETOTAL',
   'VALORBRUTO',
   'DESCONTOVALORPRODUTO',
-  'VALORLIQUIDOTOTALVENDA'
+  'VALORLIQUIDOTOTALVENDA',
+  'PRECOTOTALPRODUTO'
 ];
 
 window.onload = async () => {
@@ -102,6 +103,7 @@ function processarDadosBI(dados) {
         VALORBRUTO: 0,
         DESCONTOVALORPRODUTO: 0,
         VALORLIQUIDOTOTALVENDA: 0,
+        PRECOTOTALPRODUTO: 0,
         TIPOVENDA: tipoVenda,
         EHDEVOLUCAO: String(item.EHDEVOLUCAO || "").trim().toUpperCase()
       };
@@ -110,6 +112,7 @@ function processarDadosBI(dados) {
     lojasMap[lojaNome][osId].VALORBRUTO += parseNumeroBR(item.VALORBRUTO);
     lojasMap[lojaNome][osId].DESCONTOVALORPRODUTO += parseNumeroBR(item.DESCONTOVALORPRODUTO);
     lojasMap[lojaNome][osId].VALORLIQUIDOTOTALVENDA += parseNumeroBR(item.VALORLIQUIDOTOTALVENDA);
+    lojasMap[lojaNome][osId].PRECOTOTALPRODUTO += parseNumeroBR(item.PRECOTOTALPRODUTO);
   });
 
   let totalBrutoGeral = 0;
@@ -127,16 +130,16 @@ function processarDadosBI(dados) {
       const vBruto = venda.VALORBRUTO;
       const vDesconto = venda.DESCONTOVALORPRODUTO;
       const vLiquido = venda.VALORLIQUIDOTOTALVENDA;
+      const vPrecoTotalProd = venda.PRECOTOTALPRODUTO;
 
       const tVenda = venda.TIPOVENDA;
       const ehDev = venda.EHDEVOLUCAO;
       
-      // Identifica se é devolução pelo TIPOVENDA, flag ou se os valores são negativos
-      const eDevolucao = tVenda.includes("DEV") || tVenda.includes("ESTORNO") || ehDev === "S" || ehDev === "SIM" || vBruto < 0 || vLiquido < 0;
+      // Identifica se é devolução e acumula usando o PRECOTOTALPRODUTO transformado em positivo
+      const eDevolucao = tVenda.includes("DEV") || tVenda.includes("ESTORNO") || ehDev === "S" || ehDev === "SIM" || vPrecoTotalProd < 0 || vLiquido < 0;
 
       if (eDevolucao) {
-        // Como o valor bruto da devolução vem negativo (-), usamos Math.abs para somar positivo no card de devolução
-        totalDevolucaoGeral += Math.abs(vBruto);
+        totalDevolucaoGeral += Math.abs(vPrecoTotalProd);
         return; 
       }
 
@@ -159,6 +162,7 @@ function processarDadosBI(dados) {
 
   document.getElementById("biCardsContainer").style.display = "grid";
 }
+
 function renderizarGridTodosCampos(dados) {
   const thead = document.getElementById("cabecalhoTabela");
   const tbody = document.getElementById("corpoTabela");
