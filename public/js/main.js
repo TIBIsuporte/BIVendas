@@ -237,6 +237,7 @@ function processarDadosBI(dados, dadosDevolucoes) {
     }
   });
 
+  // Cálculo dinâmico puro das devoluções
   let totalDevolucaoGeral = 0;
   if (Array.isArray(dadosDevolucoes) && dadosDevolucoes.length > 0) {
     dadosDevolucoes.forEach(itemDev => {
@@ -256,25 +257,19 @@ function processarDadosBI(dados, dadosDevolucoes) {
     });
   }
 
+  // Cálculo dinâmico e matemático oficial: Bruto - Desconto - Devolução
   let totalLiquidoGeral = totalBrutoGeral - totalDescontoGeral - totalDevolucaoGeral;
   let qtdeVendasGeral = qtdeVendasNormais;
 
-  // --- LOGS AGRESSIVOS PARA INSPEÇÃO NO CONSOLE (F12) ---
-  console.group("🔍 [DEBUG BI] - Raio-X das Variáveis Finais");
+  // --- LOGS DE INSPEÇÃO NO CONSOLE (F12) ---
+  console.group("🔍 [DEBUG BI] - Cálculo Dinâmico");
   console.log("Total Bruto Geral:", totalBrutoGeral);
   console.log("Total Desconto Geral:", totalDescontoGeral);
-  console.log("Total Devolução Geral:", totalDevolucaoGeral);
-  console.log("Total Líquido Calculado (Bruto - Desconto - Devolução):", totalLiquidoGeral);
+  console.log("Total Devolução Calculado:", totalDevolucaoGeral);
+  console.log("Total Líquido Calculado:", totalLiquidoGeral);
   console.log("Quantidade de Vendas:", qtdeVendasGeral);
-  console.table({
-    "Bruto": totalBrutoGeral,
-    "Desconto": totalDescontoGeral,
-    "Devolução": totalDevolucaoGeral,
-    "Líquido": totalLiquidoGeral,
-    "Qtde Vendas": qtdeVendasGeral
-  });
   console.groupEnd();
-  // ------------------------------------------------------
+  // ----------------------------------------
 
   document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);
   document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);
