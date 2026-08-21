@@ -87,6 +87,7 @@ function processarDadosBI(dados) {
     });
   }
 
+  // AGRUPAMENTO POR O.S. (Garante que somamos os itens da O.S. antes de avaliar as regras)
   const osMap = {};
 
   dadosFiltrados.forEach(item => {
@@ -100,6 +101,7 @@ function processarDadosBI(dados) {
         somaDescontoItens: 0,
         liquidoOS: 0,
         descontoVendaGlobal: parseNumeroBR(item.DESCONTOVENDA),
+        liquidoVendaGlobal: parseNumeroBR(item.VLRLIQUIDOVENDA || item.VALORLIQUIDOPRODUTO || 0),
         ehDevolucaoFlag: String(item.EHDEVOLUCAO || "").trim().toUpperCase() === "D",
         tipoVenda: String(item.TIPOVENDA || "").trim().toUpperCase()
       };
@@ -116,12 +118,12 @@ function processarDadosBI(dados) {
   let qtdeVendasNormais = 0;
   let qtdeDevolucoes = 0;
 
-  console.group("🔍 LOG DE PROCESSAMENTO (CORREÇÃO DESCONTO + DEVOLUÇÃO)");
+  console.group("🔍 LOG DE PROCESSAMENTO (POR O.S.)");
 
   Object.keys(osMap).forEach(osId => {
     const venda = osMap[osId];
     
-    // Devolução real padrão (EHDEVOLUCAO === "D" ou estorno explícito)
+    // 1. Devolução Real
     const eDevolucaoReal = venda.ehDevolucaoFlag && (venda.tipoVenda === "DEVOLUCAO" || venda.tipoVenda.includes("DEV"));
 
     if (eDevolucaoReal) {
@@ -131,19 +133,20 @@ function processarDadosBI(dados) {
       return;
     }
 
-    // Se TIPOVENDA for TROCA, o DESCONTOVENDA vai para o card de Devolução
+    // 2. Troca (DESCONTOVENDA vai para Devolução)
     if (venda.tipoVenda === "TROCA") {
       const valorDevolucaoTroca = venda.descontoVendaGlobal;
       totalDevolucaoGeral += valorDevolucaoTroca;
-      console.log(`🔄 TROCA na OS ${osId} -> Direcionando DESCONTOVENDA (${valorDevolucaoTroca}) para Devolução.`);
       
-      // O valor bruto da troca entra nas vendas normais
       totalBrutoGeral += venda.valorBrutoOS;
-      qtdeVendasNormais++;
-      return; // Sai daqui para não processar como desconto normal de venda
+
+      if (venda.liquidoVendaGlobal > 0) {
+        qtdeVendasNormais++;
+      }
+      return;
     }
 
-    // Vendas Normais (Acumulam Bruto e Desconto normalmente)
+    // 3. Vendas Normais
     totalBrutoGeral += venda.valorBrutoOS;
 
     let descontoEfetivo = venda.somaDescontoItens;
@@ -152,10 +155,14 @@ function processarDadosBI(dados) {
     }
 
     totalDescontoGeral += descontoEfetivo;
-    qtdeVendasNormais++;
+
+    // Apenas conta se o valor líquido da venda for maior que zero
+    if (venda.liquidoVendaGlobal > 0) {
+      qtdeVendasNormais++;
+    }
   });
 
-  console.log(`📊 TOTAIS FINAIS -> Bruto: ${totalBrutoGeral} | Desconto: ${totalDescontoGeral} | Devolução: ${totalDevolucaoGeral}`);
+  console.log(`📊 TOTAIS FINAIS -> Bruto: ${totalBrutoGeral} | Desconto: ${totalDescontoGeral} | Devolução: ${totalDevolucaoGeral} | Qtd Vendas: ${qtdeVendasNormais}`);
   console.groupEnd();
 
   let totalLiquidoGeral = totalBrutoGeral - totalDescontoGeral - totalDevolucaoGeral;
