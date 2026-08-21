@@ -201,17 +201,19 @@ function processarDadosBI(dados, dadosDevolucoes) {
     totalLiquidoTabela += parseNumeroBR(item.LIQUIDOPRODUTO);
   });
 
-  // --- PROCESSAMENTO DE DEVOLUÇÕES / TROCAS COM FILTRO RIGOROSO ---
-  console.group("🔄 [INSPEÇÃO DE DEVOLUÇÕES/TROCAS]");
+// --- PROCESSAMENTO DE DEVOLUÇÕES / TROCAS COM FILTRO RIGOROSO ---
+  console.group("🔄 [INSPEÇÃO DE DEVOLUÇÕES]");
   console.log("Total de registros recebidos na API de Devoluções:", dadosDevolucoes?.length || 0);
 
   let totalDevolucaoGeral = 0;
 
   if (Array.isArray(dadosDevolucoes) && dadosDevolucoes.length > 0) {
     dadosDevolucoes.forEach(itemDev => {
-      // Filtro rigoroso: Ignora imediatamente se o tipo de venda não for "TROCA"
+      // Filtro rigoroso: Verifica se o tipo de venda/operação é DEVOLUCAO
       const tipoVendaDev = String(itemDev.TIPOVENDA || itemDev.TIPO || "").trim().toUpperCase();
-      if (tipoVendaDev !== "TROCA") {
+      
+      // Se não contiver "DEVOLUCAO", descarta na hora
+      if (!tipoVendaDev.includes("DEVOLUCAO")) {
         return; 
       }
 
@@ -230,15 +232,15 @@ function processarDadosBI(dados, dadosDevolucoes) {
         return;
       }
 
-      // Somar o valor correspondente da troca
+      // Somar o valor correspondente da devolução
       const valorDevolucaoItem = parseNumeroBR(itemDev.LIQUIDOPRODUTO || itemDev.VALORBRUTOPRODUTO || itemDev.PRECOTOTALPRODUTO || 0);
       totalDevolucaoGeral += valorDevolucaoItem;
     });
   }
 
-  console.log("Total Geral Calculado Apenas para Devoluções do tipo 'TROCA':", totalDevolucaoGeral);
+  console.log("Total Geral Calculado Apenas para Devoluções:", totalDevolucaoGeral);
   console.groupEnd();
-  // ----------------------------------------------------------------
+  // ----------------------------------------------------------------  // ----------------------------------------------------------------
 
   let totalLiquidoFinal = totalLiquidoTabela - totalDevolucaoGeral;
   let qtdeVendasGeral = osSet.size;
