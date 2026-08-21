@@ -22,10 +22,10 @@ app.post("/consulta", async (req, res) => {
     TIPOVENDA: req.body.TIPOVENDA || ""
   };
 
-  console.log("Processando requisição de relatório ProdutosPorOSGrid no servidor...");
+  console.log("Processando requisição de relatório ProdutosPorOS no servidor...");
 
   try {
-    const response = await fetch("https://api.savwinweb.com.br/api/APIRelatoriosCR/ProdutosPorOSGrid", {
+    const response = await fetch("https://api.savwinweb.com.br/api/APIRelatoriosCR/ProdutosPorOS", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
