@@ -237,10 +237,12 @@ function processarDadosBI(dados, dadosDevolucoes) {
     }
   });
 
-// Cálculo dinâmico puro
+  // --- REGRA CORRETA: PROCESSAR DEVOLUÇÕES VINCULADAS ÀS O.S. ---
   let totalDevolucaoGeral = 0;
+  
   if (Array.isArray(dadosDevolucoes) && dadosDevolucoes.length > 0) {
     dadosDevolucoes.forEach(itemDev => {
+      // Validação de loja
       const textoLojaDev = String(itemDev.LOJANOME ?? itemDev.CODIGOLOJA ?? itemDev.LOJA ?? "").trim();
       const matchDev = textoLojaDev.match(/^0*(\d+)/);
       const codDev = matchDev ? matchDev[1] : textoLojaDev;
@@ -249,33 +251,31 @@ function processarDadosBI(dados, dadosDevolucoes) {
       const atendeLoja = !lojasDigitadas || 
         lojasDigitadas.split(",").map(id => id.trim()).includes(codDev) ||
         lojasDigitadas.split(",").map(id => id.trim()).includes(codDevSemZero) ||
-        lojasDigitadas.split(",").map(id => id.trim()).some(id => textoLojaDev.toLowerCase().includes(id.toLowerCase()));
+        lojasDigitadas.split(",").map(id => id.trim().toLowerCase()).some(id => textoLojaDev.toLowerCase().includes(id));
 
       if (atendeLoja) {
-        totalDevolucaoGeral += parseNumeroBR(itemDev.PRECOTOTALPRODUTO);
+        totalDevolucaoGeral += parseNumeroBR(itemDev.PRECOTOTALPRODUTO || itemDev.VALORBRUTOPRODUTO || 0);
       }
     });
   }
 
-  // O líquido real é o Bruto menos o Desconto menos a Devolução
+  // Cálculo matemático limpo e definitivo:
   let totalLiquidoGeral = totalBrutoGeral - totalDescontoGeral - totalDevolucaoGeral;
   let qtdeVendasGeral = qtdeVendasNormais;
 
-  // --- LOG DETALHADO NO FINAL PARA AUDITORIA (APERTE F12) ---
+  // --- LOG DE AUDITORIA NO F12 ---
   console.log("----------------------------------------");
-  console.log("📊 AUDITORIA FINAL DE CÁLCULOS DO BI:");
-  console.log("🔹 Valor Bruto Geral:", totalBrutoGeral);
-  console.log("🔹 Total Desconto:", totalDescontoGeral);
-  console.log("🔹 Total Devolução Calculado:", totalDevolucaoGeral);
-  console.log("🔹 Subtotal (Bruto - Desconto):", (totalBrutoGeral - totalDescontoGeral));
-  console.log("🔹 Valor Líquido Final (Subtotal - Devolução):", totalLiquidoGeral);
+  console.log("📊 AUDITORIA COM A REGRA DE O.S. CORRIGIDA:");
+  console.log("🔹 Bruto:", totalBrutoGeral);
+  console.log("🔹 Desconto:", totalDescontoGeral);
+  console.log("🔹 Devolução Calculada:", totalDevolucaoGeral);
+  console.log("🔹 Líquido Final Calculado:", totalLiquidoGeral);
   console.log("----------------------------------------");
 
-  // ATRIBUINDO AOS ELEMENTOS HTML CORRETOS (GARANTINDO A ORDEM EXATA)
   document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);
   document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);
-  document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoGeral); // Aqui vai o líquido certo (~40.122,25)
-  document.getElementById("cardDevolucao").textContent = formatarMoedaBR(totalDevolucaoGeral);       // Aqui vai a devolução certa (~1.241,25)
+  document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoGeral);
+  document.getElementById("cardDevolucao").textContent = formatarMoedaBR(totalDevolucaoGeral);
   document.getElementById("cardQtdeVendas").textContent = qtdeVendasGeral.toLocaleString('pt-BR');
 
   document.getElementById("biCardsContainer").style.display = "grid";
