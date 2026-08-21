@@ -160,7 +160,6 @@ function processarDadosBI(dados, dadosDevolucoes) {
   let totalDevolucaoGeral = 0;
   if (Array.isArray(dadosDevolucoes) && dadosDevolucoes.length > 0) {
     dadosDevolucoes.forEach(itemDev => {
-      // Filtra por loja também caso venha misturado
       const textoLojaDev = String(itemDev.LOJANOME ?? itemDev.CODIGOLOJA ?? itemDev.LOJA ?? "").trim();
       const matchDev = textoLojaDev.match(/^0*(\d+)/);
       const codDev = matchDev ? matchDev[1] : textoLojaDev;
@@ -177,19 +176,18 @@ function processarDadosBI(dados, dadosDevolucoes) {
     });
   }
 
-let totalLiquidoGeral = totalBrutoGeral - totalDescontoGeral - totalDevolucaoGeral;
+  // Valor Líquido Corrigido (Bruto - Desconto - Devolução) ou ajustado conforme a regra de negócio
+  let totalLiquidoGeral = totalBrutoGeral - totalDescontoGeral - totalDevolucaoGeral;
   let qtdeVendasGeral = qtdeVendasNormais;
 
-  document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);
-  document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);
-  
-  // ATRIBUIÇÃO CORRETA PARA BATER COM A SUA ORDEM EXATA:
-  document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoGeral); // Vai receber R$ 40.122,25
-  document.getElementById("cardDevolucao").textContent = formatarMoedaBR(totalDevolucaoGeral);       // Vai receber R$ 1.241,25
-  
-  document.getElementById("cardQtdeVendas").textContent = qtdeVendasGeral.toLocaleString('pt-BR');
+  // Atribuindo aos IDs corretos do index.html
+  document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);[cite: 9]
+  document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);[cite: 9]
+  document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoGeral);[cite: 9]
+  document.getElementById("cardDevolucao").textContent = formatarMoedaBR(totalDevolucaoGeral);[cite: 9]
+  document.getElementById("cardQtdeVendas").textContent = qtdeVendasGeral.toLocaleString('pt-BR');[cite: 9]
 
-  document.getElementById("biCardsContainer").style.display = "grid";
+  document.getElementById("biCardsContainer").style.display = "grid";[cite: 8, 9]
 }
 
 function renderizarGridTodosCampos(dados) {
