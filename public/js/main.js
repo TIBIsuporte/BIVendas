@@ -116,36 +116,41 @@ function processarDadosBI(dados) {
   let qtdeVendasNormais = 0;
   let qtdeDevolucoes = 0;
 
-  console.group("🔍 LOG DE PROCESSAMENTO (TIPOVENDA = TROCA)");
+  console.group("🔍 LOG DE PROCESSAMENTO (CORREÇÃO DESCONTO + DEVOLUÇÃO)");
 
   Object.keys(osMap).forEach(osId => {
     const venda = osMap[osId];
     
-    // Devolução real estrita (evita falsos positivos como "MEU 1º 50%")
-    const eDevolucao = venda.ehDevolucaoFlag && (venda.tipoVenda === "DEVOLUCAO" || venda.tipoVenda.includes("DEV"));
+    // Devolução real padrão (EHDEVOLUCAO === "D" ou estorno explícito)
+    const eDevolucaoReal = venda.ehDevolucaoFlag && (venda.tipoVenda === "DEVOLUCAO" || venda.tipoVenda.includes("DEV"));
 
-    if (eDevolucao) {
+    if (eDevolucaoReal) {
       const valorDev = Math.abs(venda.liquidoOS > 0 ? venda.liquidoOS : venda.valorBrutoOS);
       totalDevolucaoGeral += valorDev;
       qtdeDevolucoes++;
       return;
     }
 
-    totalBrutoGeral += venda.valorBrutoOS;
-
-    // APLICANDO A REGRA EXATA DO TIPOVENDA = "TROCA"
-    let descontoEfetivo = 0;
-
-    // APLICANDO  REGRA  Se for TROCA, o DESCONTOVENDA vai para a Devolução
+    // Se TIPOVENDA for TROCA, o DESCONTOVENDA vai para o card de Devolução
     if (venda.tipoVenda === "TROCA") {
       const valorDevolucaoTroca = venda.descontoVendaGlobal;
       totalDevolucaoGeral += valorDevolucaoTroca;
-      console.log(`🔄 O.S. de TROCA convertida em Devolução -> OS: ${osId} | Valor Devolução (DescontoVenda): ${valorDevolucaoTroca}`);
+      console.log(`🔄 TROCA na OS ${osId} -> Direcionando DESCONTOVENDA (${valorDevolucaoTroca}) para Devolução.`);
       
-      // Como o valor foi tratado como devolução, não somamos como desconto de venda normal
-      qtdeVendasNormais++; // Ou tratamos o contador de O.S. conforme sua preferência
-      return;
+      // O valor bruto da troca entra nas vendas normais
+      totalBrutoGeral += venda.valorBrutoOS;
+      qtdeVendasNormais++;
+      return; // Sai daqui para não processar como desconto normal de venda
     }
+
+    // Vendas Normais (Acumulam Bruto e Desconto normalmente)
+    totalBrutoGeral += venda.valorBrutoOS;
+
+    let descontoEfetivo = venda.somaDescontoItens;
+    if (venda.descontoVendaGlobal > descontoEfetivo) {
+      descontoEfetivo = venda.descontoVendaGlobal;
+    }
+
     totalDescontoGeral += descontoEfetivo;
     qtdeVendasNormais++;
   });
