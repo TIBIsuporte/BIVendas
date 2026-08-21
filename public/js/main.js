@@ -136,16 +136,16 @@ function processarDadosBI(dados) {
     // APLICANDO A REGRA EXATA DO TIPOVENDA = "TROCA"
     let descontoEfetivo = 0;
 
+    // APLICANDO  REGRA  Se for TROCA, o DESCONTOVENDA vai para a Devolução
     if (venda.tipoVenda === "TROCA") {
-      descontoEfetivo = venda.descontoVendaGlobal;
-      console.log(`🔄 TROCA detectada na OS ${osId} -> Usando DESCONTOVENDA: ${descontoEfetivo}`);
-    } else {
-      descontoEfetivo = venda.somaDescontoItens;
-      if (venda.descontoVendaGlobal > descontoEfetivo) {
-        descontoEfetivo = venda.descontoVendaGlobal;
-      }
+      const valorDevolucaoTroca = venda.descontoVendaGlobal;
+      totalDevolucaoGeral += valorDevolucaoTroca;
+      console.log(`🔄 O.S. de TROCA convertida em Devolução -> OS: ${osId} | Valor Devolução (DescontoVenda): ${valorDevolucaoTroca}`);
+      
+      // Como o valor foi tratado como devolução, não somamos como desconto de venda normal
+      qtdeVendasNormais++; // Ou tratamos o contador de O.S. conforme sua preferência
+      return;
     }
-
     totalDescontoGeral += descontoEfetivo;
     qtdeVendasNormais++;
   });
