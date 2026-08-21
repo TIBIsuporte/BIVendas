@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Auditoria: BI</title>
+  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <div class="header-titulo">
+    <h2>Auditoria: BI</h2>
+    <span class="titulo-aga">by AGA</span>
+  </div>
+
+  <div class="filtros">
+    <div class="linha">
+      <label>Lojas (IDs separados por vírgula):
+        <div class="input-grupo" style="margin-top: 5px;">
+          <input type="text" id="lojas" placeholder="Ex: 540,541 ou selecione no botão">
+          <button type="button" class="btn-modal" onclick="abrirModalLojas()">Selecionar Lojas</button>
+        </div>
+      </label>
+    </div>
+    <div class="linha">
+      <label>Data Inicial:
+        <input type="date" id="dataInicial">
+      </label>
+      <label>Data Final:
+        <input type="date" id="dataFinal">
+      </label>
+    </div>
+    <div class="linha">
+      <label>Tipo de Data:
+        <select id="tipodata">
+          <option value="VENDA" selected>VENDA</option>
+          <option value="PAGAMENTO">PAGAMENTO</option>
+          <option value="ENTREGA">ENTREGA</option>
+        </select>
+      </label>
+    </div>
+    <button class="btn-acao" onclick="consultar()">Consultar Relatório Completo</button>
+  </div>
+
+  <div id="resultado"></div>
+
+  <div class="bi-cards-container" id="biCardsContainer" style="display: none;">
+    <div class="bi-card">
+      <div class="bi-card-title">Valor Bruto</div>
+      <div class="bi-card-value" id="cardValorBruto">R$ 0,00</div>
+    </div>
+    <div class="bi-card">
+      <div class="bi-card-title">Desconto</div>
+      <div class="bi-card-value" id="cardDesconto" style="color: #d9534f;">R$ 0,00</div>
+    </div>
+    <div class="bi-card">
+      <div class="bi-card-title">Valor Líquido</div>
+      <div class="bi-card-value" id="cardValorLiquido" style="color: #0275d8;">R$ 0,00</div>
+    </div>
+    <div class="bi-card">
+      <div class="bi-card-title">Devolução</div>
+      <div class="bi-card-value" id="cardDevolucao" style="color: #f0ad4e;">R$ 0,00</div>
+    </div>
+    <div class="bi-card">
+      <div class="bi-card-title">Qtde Vendas (O.S.)</div>
+      <div class="bi-card-value" id="cardQtdeVendas">0</div>
+    </div>
+  </div>
+
+  <div class="grid-container">
+    <h3>
+      <span>Resultado da Consulta</span>
+      <span id="totalRegistros" style="font-size: 13px; color: #555;">0 registros encontrados</span>
+    </h3>
+    <div class="table-wrapper">
+      <table id="tabelaDados">
+        <thead id="cabecalhoTabela">
+          <tr><th>Aguardando Consulta</th></tr>
+        </thead>
+        <tbody id="corpoTabela">
+          <tr><td style="text-align: center; color: #777;">Preencha os filtros e clique em Consultar.</td></tr>
+        </tbody>
+        <tfoot id="rodapeTabela"></tfoot>
+      </table>
+    </div>
+  </div>
+
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text">Buscando relatório na API, por favor aguarde...</div>
+  </div>
+
+  <div id="modalLojas" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span>Selecionar Lojas</span>
+      </div>
+      <div class="modal-busca-container">
+        <label>Filtrar por Código, Nome da Loja ou Gerente:</label>
+        <input type="text" id="inputFiltroGerenteModal" placeholder="Digite para filtrar..." onkeyup="filtrarLojasNoModal()">
+      </div>
+      <div style="margin-bottom: 8px;">
+        <label style="font-size: 13px; cursor: pointer; font-weight: bold; display: flex; justify-content: flex-start; gap: 8px;">
+          <input type="checkbox" id="selecionarTodasLojas" onclick="toggleSelecionarTodasLojas(this)" style="width: auto;"> Selecionar / Desmarcar Lojas Visíveis
+        </label>
+      </div>
+      <div class="modal-body" id="listaLojasModal"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secundario" onclick="fecharModalLojas()">Cancelar</button>
+        <button type="button" onclick="confirmarSelecaoLojas()">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/lojas-modal.js"></script>
+
+  <script src="/js/main.js"></script>
+</body>
+</html>
