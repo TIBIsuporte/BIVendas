@@ -12,8 +12,91 @@ const COLUNAS_VALORES_TOTALIZAR = [
 ];
 
 window.onload = async () => {
-  await carregarLojasSupabase(supabaseClient);
+  await carregarLojasSupabase();
 };
+
+// --- FUNÇÕES DE SUPORTE A LOJAS (SUPABASE E MODAL) ---
+async function carregarLojasSupabase() {
+  try {
+    const { data, error } = await supabaseClient
+      .from('lojas') // Confirme se o nome da tabela no seu Supabase é 'lojas' ou ajuste aqui
+      .select('*')
+      .order('codigo', { ascending: true });
+
+    if (error) {
+      console.error("Erro ao buscar lojas do Supabase:", error.message);
+      return;
+    }
+
+    window.listaLojasGlobal = data || [];
+    renderizarListaLojasModal(window.listaLojasGlobal);
+  } catch (err) {
+    console.error("Erro inesperado ao carregar lojas:", err);
+  }
+}
+
+function renderizarListaLojasModal(lojas) {
+  const container = document.getElementById("listaLojasModal");
+  if (!container) return;
+  
+  container.innerHTML = "";
+
+  if (!lojas || lojas.length === 0) {
+    container.innerHTML = "<div style='padding: 10px; text-align: center;'>Nenhuma loja encontrada.</div>";
+    return;
+  }
+
+  lojas.forEach(loja => {
+    const div = document.createElement("div");
+    div.className = "modal-item-loja";
+    div.style.padding = "6px 8px";
+    div.style.borderBottom = "1px solid #eee";
+    div.style.display = "flex";
+    div.style.alignItems = "center";
+    div.style.gap = "10px";
+
+    const codigo = loja.codigo ?? loja.ID ?? loja.id ?? "";
+    const nome = loja.nome ?? loja.NOME ?? loja.razao_social ?? "";
+
+    div.innerHTML = `
+      <input type="checkbox" class="chk-loja-modal" value="${codigo}" style="width: auto;">
+      <span style="font-size: 13px;"><b>${codigo}</b> - ${nome}</span>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function abrirModalLojas() {
+  const modal = document.getElementById("modalLojas");
+  if (modal) modal.style.display = "flex";
+}
+
+function fecharModalLojas() {
+  const modal = document.getElementById("modalLojas");
+  if (modal) modal.style.display = "none";
+}
+
+function filtrarLojasNoModal() {
+  const termo = document.getElementById("inputFiltroGerenteModal").value.toLowerCase();
+  const filtradas = window.listaLojasGlobal.filter(l => {
+    const str = `${l.codigo} ${l.nome} ${l.gerente || ''}`.toLowerCase();
+    return str.includes(termo);
+  });
+  renderizarListaLojasModal(filtradas);
+}
+
+function toggleSelecionarTodasLojas(master) {
+  const checkboxes = document.querySelectorAll(".chk-loja-modal");
+  checkboxes.forEach(chk => chk.checked = master.checked);
+}
+
+function confirmarSelecaoLojas() {
+  const checkboxes = document.querySelectorAll(".chk-loja-modal:checked");
+  const selecionados = Array.from(checkboxes).map(chk => chk.value);
+  document.getElementById("lojas").value = selecionados.join(",");
+  fecharModalLojas();
+}
+// ----------------------------------------------------
 
 function formatarDataISOparaBR(dataISO) {
   if (!dataISO) return "";
@@ -50,7 +133,6 @@ async function consultar() {
   };
 
   try {
-    // 1. Executa a consulta principal da Grid e a consulta de Devoluções em paralelo
     const [resGrid, resDevolucoes] = await Promise.all([
       fetch("/consulta", {
         method: "POST",
@@ -156,7 +238,6 @@ function processarDadosBI(dados, dadosDevolucoes) {
     }
   });
 
-  // Cálculo dedicado para o total de devoluções usando PRECOTOTALPRODUTO da API de Devoluções
   let totalDevolucaoGeral = 0;
   if (Array.isArray(dadosDevolucoes) && dadosDevolucoes.length > 0) {
     dadosDevolucoes.forEach(itemDev => {
@@ -176,18 +257,16 @@ function processarDadosBI(dados, dadosDevolucoes) {
     });
   }
 
-  // Valor Líquido Corrigido (Bruto - Desconto - Devolução) ou ajustado conforme a regra de negócio
   let totalLiquidoGeral = totalBrutoGeral - totalDescontoGeral - totalDevolucaoGeral;
   let qtdeVendasGeral = qtdeVendasNormais;
 
-  // Atribuindo aos IDs corretos do index.html
-  document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);[cite: 9]
-  document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);[cite: 9]
-  document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoGeral);[cite: 9]
-  document.getElementById("cardDevolucao").textContent = formatarMoedaBR(totalDevolucaoGeral);[cite: 9]
-  document.getElementById("cardQtdeVendas").textContent = qtdeVendasGeral.toLocaleString('pt-BR');[cite: 9]
+  document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);
+  document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);
+  document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoGeral);
+  document.getElementById("cardDevolucao").textContent = formatarMoedaBR(totalDevolucaoGeral);
+  document.getElementById("cardQtdeVendas").textContent = qtdeVendasGeral.toLocaleString('pt-BR');
 
-  document.getElementById("biCardsContainer").style.display = "grid";[cite: 8, 9]
+  document.getElementById("biCardsContainer").style.display = "grid";
 }
 
 function renderizarGridTodosCampos(dados) {
