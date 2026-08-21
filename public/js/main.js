@@ -190,8 +190,10 @@ function processarDadosBI(dados, dadosDevolucoes) {
   let totalBrutoGeral = 0;
   let totalDescontoGeral = 0;
   let totalLiquidoTabela = 0;
+  let totalDevolucaoGeral = 0; // Inicializamos a variável de devolução aqui para acumular tudo
   const osSet = new Set();
 
+  // --- 1. PROCESSAMENTO DA API PRINCIPAL (ProdutosPorOSGRID) ---
   dadosFiltrados.forEach(item => {
     const osId = String(item.OS || item.CODIGODAVENDA || "").trim();
     if (osId) osSet.add(osId);
@@ -199,13 +201,19 @@ function processarDadosBI(dados, dadosDevolucoes) {
     totalBrutoGeral += parseNumeroBR(item.VALORBRUTOPRODUTO);
     totalDescontoGeral += parseNumeroBR(item.DESCPRODUTO);
     totalLiquidoTabela += parseNumeroBR(item.LIQUIDOPRODUTO);
+
+    // REGRA NOVA: Avaliar se TIPOVENDA é igual a TROCA nos dados da API principal
+    const tipoVendaPrincipal = String(item.TIPOVENDA || "").trim().toUpperCase();
+    if (tipoVendaPrincipal === "TROCA") {
+      // Se for troca, soma o valor da coluna DESCONTOVENDA (ou altere para outro campo se necessário) na devolução
+      const valorTrocaDesconto = parseNumeroBR(item.DESCONTOVENDA || item.LIQUIDOPRODUTO || 0);
+      totalDevolucaoGeral += valorTrocaDesconto;
+    }
   });
 
-  // --- PROCESSAMENTO DE DEVOLUÇÕES COM FILTRO RIGOROSO ---
+  // --- 2. PROCESSAMENTO DA API DE DEVOLUÇÕES (consultadevolucoes) ---
   console.group("🔄 [INSPEÇÃO DE DEVOLUÇÕES]");
   console.log("Total de registros recebidos na API de Devoluções:", dadosDevolucoes?.length || 0);
-
-  let totalDevolucaoGeral = 0;
 
   if (Array.isArray(dadosDevolucoes) && dadosDevolucoes.length > 0) {
     dadosDevolucoes.forEach(itemDev => {
@@ -234,11 +242,10 @@ function processarDadosBI(dados, dadosDevolucoes) {
     });
   }
 
-  console.log("Total Geral Calculado Apenas para Devoluções:", totalDevolucaoGeral);
+  console.log("Total Geral Calculado para Devoluções (Incluindo Trocas da API Principal):", totalDevolucaoGeral);
   console.groupEnd();
   // ----------------------------------------------------------------
 
-  // Valor Líquido Final subtraindo o valor da devolução
   let totalLiquidoFinal = totalLiquidoTabela - totalDevolucaoGeral;
   let qtdeVendasGeral = osSet.size;
 
