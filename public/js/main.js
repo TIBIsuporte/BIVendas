@@ -2,9 +2,9 @@ const SUPABASE_URL = 'https://cwmofpwuihrnifsvqhik.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_biWjIRo9x6maeZXcoKX6Lw_l-fjV0wP';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Colunas atualizadas para a nova estrutura baseada em itens por OS
 const COLUNAS_VALORES_TOTALIZAR = [
   'QUANTIDADE',
+  'QUANTIDADETOTAL',
   'VALORBRUTOPRODUTO',
   'DESCPRODUTO',
   'LIQUIDOPRODUTO',
@@ -36,25 +36,44 @@ async function consultar() {
   document.getElementById("loadingOverlay").style.display = "flex";
   document.getElementById("resultado").innerHTML = "";
 
-  const body = {
-    DATAINICIAL: formatarDataISOparaBR(document.getElementById("dataInicial").value),
-    DATAFINAL: formatarDataISOparaBR(document.getElementById("dataFinal").value),
-    LOJAS: document.getElementById("lojas").value,
-    TIPODATA: document.getElementById("tipodata").value || "VENDA",
+  const dataInicial = formatarDataISOparaBR(document.getElementById("dataInicial").value);
+  const dataFinal = formatarDataISOparaBR(document.getElementById("dataFinal").value);
+  const lojas = document.getElementById("lojas").value;
+  const tipodata = document.getElementById("tipodata").value || "VENDA";
+
+  const bodyReq = {
+    DATAINICIAL: dataInicial,
+    DATAFINAL: dataFinal,
+    LOJAS: lojas,
+    TIPODATA: tipodata,
     TIPOVENDA: ""
   };
 
   try {
-    const response = await fetch("/consulta", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    });
+    // 1. Executa a consulta principal da Grid e a consulta de Devoluções em paralelo
+    const [resGrid, resDevolucoes] = await Promise.all([
+      fetch("/consulta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bodyReq)
+      }),
+      fetch("/consultadevolucoes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bodyReq)
+      })
+    ]);
 
-    if (!response.ok) throw new Error("Erro na requisição: " + response.status);
+    if (!resGrid.ok) throw new Error("Erro na requisição da Grid: " + resGrid.status);
+    
+    const dadosBrutos = await resGrid.json();
+    let dadosDevolucoes = [];
 
-    const dadosBrutos = await response.json();
-    processarDadosBI(dadosBrutos);
+    if (resDevolucoes.ok) {
+      dadosDevolucoes = await resDevolucoes.json();
+    }
+
+    processarDadosBI(dadosBrutos, dadosDevolucoes);
     renderizarGridTodosCampos(dadosBrutos);
   } catch (error) {
     document.getElementById("resultado").innerHTML = "<p class='erro'>" + error.message + "</p>";
@@ -64,7 +83,7 @@ async function consultar() {
   }
 }
 
-function processarDadosBI(dados) {
+function processarDadosBI(dados, dadosDevolucoes) {
   if (!dados || dados.length === 0) {
     document.getElementById("biCardsContainer").style.display = "none";
     return;
@@ -87,7 +106,6 @@ function processarDadosBI(dados) {
     });
   }
 
-  // AGRUPAMENTO POR O.S. (Garante que somamos os itens da O.S. antes de avaliar as regras)
   const osMap = {};
 
   dadosFiltrados.forEach(item => {
@@ -102,7 +120,6 @@ function processarDadosBI(dados) {
         liquidoOS: 0,
         descontoVendaGlobal: parseNumeroBR(item.DESCONTOVENDA),
         liquidoVendaGlobal: parseNumeroBR(item.VLRLIQUIDOVENDA || item.VALORLIQUIDOPRODUTO || 0),
-        ehDevolucaoFlag: String(item.EHDEVOLUCAO || "").trim().toUpperCase() === "D",
         tipoVenda: String(item.TIPOVENDA || "").trim().toUpperCase()
       };
     }
@@ -114,39 +131,17 @@ function processarDadosBI(dados) {
 
   let totalBrutoGeral = 0;
   let totalDescontoGeral = 0;
-  let totalDevolucaoGeral = 0;
   let qtdeVendasNormais = 0;
-  let qtdeDevolucoes = 0;
-
-  console.group("🔍 LOG DE PROCESSAMENTO (POR O.S.)");
 
   Object.keys(osMap).forEach(osId => {
     const venda = osMap[osId];
-    
-    // 1. Devolução Real
-    const eDevolucaoReal = venda.ehDevolucaoFlag && (venda.tipoVenda === "DEVOLUCAO" || venda.tipoVenda.includes("DEV"));
 
-    if (eDevolucaoReal) {
-      const valorDev = Math.abs(venda.liquidoOS > 0 ? venda.liquidoOS : venda.valorBrutoOS);
-      totalDevolucaoGeral += valorDev;
-      qtdeDevolucoes++;
-      return;
-    }
-
-    // 2. Troca (DESCONTOVENDA vai para Devolução)
     if (venda.tipoVenda === "TROCA") {
-      const valorDevolucaoTroca = venda.descontoVendaGlobal;
-      totalDevolucaoGeral += valorDevolucaoTroca;
-      
       totalBrutoGeral += venda.valorBrutoOS;
-
-      if (venda.liquidoVendaGlobal > 0) {
-        qtdeVendasNormais++;
-      }
+      if (venda.liquidoVendaGlobal > 0) qtdeVendasNormais++;
       return;
     }
 
-    // 3. Vendas Normais
     totalBrutoGeral += venda.valorBrutoOS;
 
     let descontoEfetivo = venda.somaDescontoItens;
@@ -156,18 +151,34 @@ function processarDadosBI(dados) {
 
     totalDescontoGeral += descontoEfetivo;
 
-    // Apenas conta se o valor líquido da venda for maior que zero
     if (venda.liquidoVendaGlobal > 0) {
       qtdeVendasNormais++;
     }
   });
 
-  console.log(`📊 TOTAIS FINAIS -> Bruto: ${totalBrutoGeral} | Desconto: ${totalDescontoGeral} | Devolução: ${totalDevolucaoGeral} | Qtd Vendas: ${qtdeVendasNormais}`);
-  console.groupEnd();
+  // Cálculo dedicado para o total de devoluções usando PRECOTOTALPRODUTO da API de Devoluções
+  let totalDevolucaoGeral = 0;
+  if (Array.isArray(dadosDevolucoes) && dadosDevolucoes.length > 0) {
+    dadosDevolucoes.forEach(itemDev => {
+      // Filtra por loja também caso venha misturado
+      const textoLojaDev = String(itemDev.LOJANOME ?? itemDev.CODIGOLOJA ?? itemDev.LOJA ?? "").trim();
+      const matchDev = textoLojaDev.match(/^0*(\d+)/);
+      const codDev = matchDev ? matchDev[1] : textoLojaDev;
+      const codDevSemZero = matchDev ? String(parseInt(matchDev[1], 10)) : codDev;
+
+      const atendeLoja = !lojasDigitadas || 
+        lojasDigitadas.split(",").map(id => id.trim()).includes(codDev) ||
+        lojasDigitadas.split(",").map(id => id.trim()).includes(codDevSemZero) ||
+        lojasDigitadas.split(",").map(id => id.trim()).some(id => textoLojaDev.toLowerCase().includes(id.toLowerCase()));
+
+      if (atendeLoja) {
+        totalDevolucaoGeral += parseNumeroBR(itemDev.PRECOTOTALPRODUTO);
+      }
+    });
+  }
 
   let totalLiquidoGeral = totalBrutoGeral - totalDescontoGeral - totalDevolucaoGeral;
-  let qtdeVendasGeral = qtdeVendasNormais - qtdeDevolucoes;
-  if (qtdeVendasGeral < 0) qtdeVendasGeral = 0;
+  let qtdeVendasGeral = qtdeVendasNormais;
 
   document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);
   document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);
@@ -259,7 +270,7 @@ function renderizarGridTodosCampos(dados) {
     if (index === 0) {
       td.textContent = "TOTAL";
     } else if (COLUNAS_VALORES_TOTALIZAR.includes(colunaUpper)) {
-      if (colunaUpper === 'QUANTIDADE') {
+      if (colunaUpper.includes('QUANTIDADE')) {
         td.textContent = totais[colunaUpper].toLocaleString('pt-BR', { minimumFractionDigits: 2 });
       } else {
         td.textContent = formatarMoedaBR(totais[colunaUpper]);
