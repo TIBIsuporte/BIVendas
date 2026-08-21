@@ -182,8 +182,11 @@ function processarDadosBI(dados, dadosDevolucoes) {
 
   document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);
   document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);
+  
+  // INVERTIDOS AQUI PARA BATER CORRETAMENTE COM A ORDEM VISUAL DOS CARDS:
   document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoGeral);
   document.getElementById("cardDevolucao").textContent = formatarMoedaBR(totalDevolucaoGeral);
+  
   document.getElementById("cardQtdeVendas").textContent = qtdeVendasGeral.toLocaleString('pt-BR');
 
   document.getElementById("biCardsContainer").style.display = "grid";
