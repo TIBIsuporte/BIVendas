@@ -193,30 +193,37 @@ function processarDadosBI(dados, dadosDevolucoes) {
   let totalDevolucaoGeral = 0; 
   const osSet = new Set();
 
+  console.group("🔍 [DEBUG] Analisando itens da API Principal");
+
   // --- 1. PROCESSAMENTO DA API PRINCIPAL (ProdutosPorOSGRID) ---
-  dadosFiltrados.forEach(item => {
+  dadosFiltrados.forEach((item, index) => {
     const osId = String(item.OS || item.CODIGODAVENDA || "").trim();
     if (osId) osSet.add(osId);
 
-    totalBrutoGeral += parseNumeroBR(item.VALORBRUTOPRODUTO);
-    totalDescontoGeral += parseNumeroBR(item.DESCPRODUTO);
-    totalLiquidoTabela += parseNumeroBR(item.LIQUIDOPRODUTO);
-
-    // REGRA DE TROCA: Se for troca, pegamos o valor (que já vem negativo ou do líquido)
+    const brutoItem = parseNumeroBR(item.VALORBRUTOPRODUTO);
+    const descItem = parseNumeroBR(item.DESCPRODUTO);
+    const liquidoItem = parseNumeroBR(item.LIQUIDOPRODUTO);
     const tipoVendaPrincipal = String(item.TIPOVENDA || "").trim().toUpperCase();
+
+    totalBrutoGeral += brutoItem;
+    totalDescontoGeral += descItem;
+    totalLiquidoTabela += liquidoItem;
+
+    // Log individual se for TROCA para inspecionar os campos
     if (tipoVendaPrincipal === "TROCA") {
-      // Pegamos o valor líquido do item de troca (ajuste o campo se necessário, ex: LIQUIDOPRODUTO)
-      let valorTroca = parseNumeroBR(item.LIQUIDOPRODUTO || item.DESCONTOVENDA || 0);
-      // Se ele vier positivo por engano, transformamos em negativo para padronizar com as devoluções
-      if (valorTroca > 0) valorTroca = -valorTroca;
+      console.log(`[TROCA ENCONTRADA] OS: ${osId} | TIPOVENDA: ${tipoVendaPrincipal} | LIQUIDO: ${liquidoItem} | DESCONTOVENDA: ${item.DESCONTOVENDA}`, item);
+      
+      // Aqui testamos a captura do valor da troca
+      let valorTroca = parseNumeroBR(item.DESCONTOVENDA || item.LIQUIDOPRODUTO || 0);
+      if (valorTroca > 0) valorTroca = -valorTroca; // Mantém negativo para abater corretamente
       totalDevolucaoGeral += valorTroca;
     }
   });
 
-  // --- 2. PROCESSAMENTO DA API DE DEVOLUÇÕES (consultadevolucoes) ---
-  console.group("🔄 [INSPEÇÃO DE DEVOLUÇÕES]");
-  console.log("Total de registros recebidos na API de Devoluções:", dadosDevolucoes?.length || 0);
+  console.groupEnd();
 
+  // --- 2. PROCESSAMENTO DA API DE DEVOLUÇÕES (consultadevolucoes) ---
+  console.group("🔄 [DEBUG] Analisando API de Devoluções");
   if (Array.isArray(dadosDevolucoes) && dadosDevolucoes.length > 0) {
     dadosDevolucoes.forEach(itemDev => {
       const tipoVendaDev = String(itemDev.TIPOVENDA || itemDev.TIPO || "").trim().toUpperCase();
@@ -241,31 +248,32 @@ function processarDadosBI(dados, dadosDevolucoes) {
 
       let valorDevolucaoItem = parseNumeroBR(itemDev.LIQUIDOPRODUTO || itemDev.VALORBRUTOPRODUTO || itemDev.PRECOTOTALPRODUTO || 0);
       if (valorDevolucaoItem > 0) valorDevolucaoItem = -valorDevolucaoItem;
+      
+      console.log(`[DEVOLUÇÃO ENCONTRADA] Valor: ${valorDevolucaoItem}`, itemDev);
       totalDevolucaoGeral += valorDevolucaoItem;
     });
   }
-
-  console.log("Total Geral Calculado para Devoluções:", totalDevolucaoGeral);
   console.groupEnd();
-  // ----------------------------------------------------------------
 
-  // Como totalDevolucaoGeral é negativo (ex: -1241.25), somá-lo ao líquido faz a subtração correta:
-  // Ex: 41363.50 + (-1241.25) = 40122.25
+  // --- 3. CÁLCULO FINAL ---
   let totalLiquidoFinal = totalLiquidoTabela + totalDevolucaoGeral;
   let qtdeVendasGeral = osSet.size;
+
+  console.log("📊 [RESUMO FINAL DOS CÁLCULOS]");
+  console.log("Total Bruto:", totalBrutoGeral);
+  console.log("Total Desconto:", totalDescontoGeral);
+  console.log("Total Líquido da Tabela:", totalLiquidoTabela);
+  console.log("Total Devolução/Troca Acumulado:", totalDevolucaoGeral);
+  console.log("Total Líquido Final (Tabela + Devolução Negativa):", totalLiquidoFinal);
 
   document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);
   document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);
   document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoFinal);
-  
-  // O card vai exibir o valor negativo bonitinho como estava antes (-R$ 1.241,25)
   document.getElementById("cardDevolucao").textContent = formatarMoedaBR(totalDevolucaoGeral);
-  
   document.getElementById("cardQtdeVendas").textContent = qtdeVendasGeral.toLocaleString('pt-BR');
 
   document.getElementById("biCardsContainer").style.display = "grid";
 }
-
 function renderizarGridTodosCampos(dados) {
   const thead = document.getElementById("cabecalhoTabela");
   const tbody = document.getElementById("corpoTabela");
