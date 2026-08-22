@@ -202,10 +202,13 @@ function processarDadosBI(dados, dadosDevolucoes) {
     totalDescontoGeral += parseNumeroBR(item.DESCPRODUTO);
     totalLiquidoTabela += parseNumeroBR(item.LIQUIDOPRODUTO);
 
-    // REGRA DE TROCA: Garantimos com Math.abs que o valor entre positivo no acumulador
+    // REGRA DE TROCA: Se for troca, pegamos o valor (que já vem negativo ou do líquido)
     const tipoVendaPrincipal = String(item.TIPOVENDA || "").trim().toUpperCase();
     if (tipoVendaPrincipal === "TROCA") {
-      const valorTroca = Math.abs(parseNumeroBR(item.DESCONTOVENDA || item.LIQUIDOPRODUTO || 0));
+      // Pegamos o valor líquido do item de troca (ajuste o campo se necessário, ex: LIQUIDOPRODUTO)
+      let valorTroca = parseNumeroBR(item.LIQUIDOPRODUTO || item.DESCONTOVENDA || 0);
+      // Se ele vier positivo por engano, transformamos em negativo para padronizar com as devoluções
+      if (valorTroca > 0) valorTroca = -valorTroca;
       totalDevolucaoGeral += valorTroca;
     }
   });
@@ -236,8 +239,8 @@ function processarDadosBI(dados, dadosDevolucoes) {
         return;
       }
 
-      // Garantimos com Math.abs que venha positivo para o acumulador
-      const valorDevolucaoItem = Math.abs(parseNumeroBR(itemDev.LIQUIDOPRODUTO || itemDev.VALORBRUTOPRODUTO || itemDev.PRECOTOTALPRODUTO || 0));
+      let valorDevolucaoItem = parseNumeroBR(itemDev.LIQUIDOPRODUTO || itemDev.VALORBRUTOPRODUTO || itemDev.PRECOTOTALPRODUTO || 0);
+      if (valorDevolucaoItem > 0) valorDevolucaoItem = -valorDevolucaoItem;
       totalDevolucaoGeral += valorDevolucaoItem;
     });
   }
@@ -246,16 +249,17 @@ function processarDadosBI(dados, dadosDevolucoes) {
   console.groupEnd();
   // ----------------------------------------------------------------
 
-  // Subtração limpa e correta: Líquido - Devoluções/Trocas positivas
-  let totalLiquidoFinal = totalLiquidoTabela - totalDevolucaoGeral;
+  // Como totalDevolucaoGeral é negativo (ex: -1241.25), somá-lo ao líquido faz a subtração correta:
+  // Ex: 41363.50 + (-1241.25) = 40122.25
+  let totalLiquidoFinal = totalLiquidoTabela + totalDevolucaoGeral;
   let qtdeVendasGeral = osSet.size;
 
   document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);
   document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);
   document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoFinal);
   
-  // Exibimos no card com o sinal de menos na frente, mas a base numérica é positiva para o cálculo
-  document.getElementById("cardDevolucao").textContent = "- " + formatarMoedaBR(totalDevolucaoGeral);
+  // O card vai exibir o valor negativo bonitinho como estava antes (-R$ 1.241,25)
+  document.getElementById("cardDevolucao").textContent = formatarMoedaBR(totalDevolucaoGeral);
   
   document.getElementById("cardQtdeVendas").textContent = qtdeVendasGeral.toLocaleString('pt-BR');
 
