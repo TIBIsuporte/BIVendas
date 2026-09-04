@@ -1,6 +1,6 @@
 /**
  * Módulo Principal de Execução e Regras de Negócio do BI
- * Gerencia o carregamento de lojas, o envio de requisições paralelas para as APIs
+ * Gerencia o carregamento de lojas, o envio de requisições paralelas para las APIs
  * e a renderização completa da Grid e dos Cards de Indicadores.
  */
 
@@ -232,7 +232,7 @@ function processarDadosBI(dados, dadosPagamentos) {
         const qtdUso = parseNumeroBR(pgto.QTDE_USO || 1);
         const valorTotalPgto = parseNumeroBR(pgto.VENDAS_VALOR || 0);
 
-        return `<div style="margin-bottom: 4px;"><strong>${meio}${bandeira}${forma}</strong><br>Parcelas: ${parcelas} | Qtd: ${qtdUso} | Total: ${formatarMoedaBR(valorTotalPgto)}</div>`;
+        return `<div style="margin-bottom: 6px;"><strong>${meio}${bandeira}${forma}</strong><br>Parcelas: ${parcelas} | Qtd: ${qtdUso} | Total: ${formatarMoedaBR(valorTotalPgto)}</div>`;
       }).join("<hr style='border:0; border-top:1px dashed #ccc; margin:6px 0;'>");
     } else {
       htmlPagamentos = "Nenhum registro de pagamento para a(s) loja(s) selecionada(s).";
