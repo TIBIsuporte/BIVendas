@@ -9,6 +9,7 @@ const SUPABASE_KEY = 'sb_publishable_biWjIRo9x6maeZXcoKX6Lw_l-fjV0wP';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let lojasDisponiveis = [];
+let meuGraficoLojas = null; // <- Variável global posicionada corretamente aqui!
 
 window.onload = async () => {
   await carregarLojasSupabase();
@@ -401,4 +402,63 @@ function processarDadosBI(dados, dadosPagamentos) {
   document.getElementById("biTabsHeader").style.display = "flex";
   document.getElementById("biCardsContainer").style.display = "flex";
   mudarAba('cards');
+
+  // --- CHAMADA DA FUNÇÃO DO GRÁFICO ---
+  renderizarGraficoParticipacao(totaisPorLoja, totalLiquidoGeral);
+}
+
+// --- FUNÇÃO PARA GERAR O GRÁFICO DE PORCENTAGEM (CHART.JS) ---
+function renderizarGraficoParticipacao(totaisPorLoja, totalLiquidoGeral) {
+  const ctx = document.getElementById('graficoParticipacaoLojas');
+  if (!ctx) return;
+
+  const labels = [];
+  const dadosPorcentagem = [];
+  const coresFundo = [
+    '#0078d7', '#5cb85c', '#f0ad4e', '#d9534f', '#6f42c1', 
+    '#17a2b8', '#e83e8c', '#fd7e14', '#20c997', '#6610f2'
+  ];
+
+  Object.keys(totaisPorLoja).forEach(idLoja => {
+    const t = totaisPorLoja[idLoja];
+    labels.push(`Loja ${idLoja}`);
+    
+    // Calcula a porcentagem em relação ao líquido total geral
+    const porcentagem = totalLiquidoGeral > 0 ? ((t.liquido / totalLiquidoGeral) * 100) : 0;
+    dadosPorcentagem.push(porcentagem.toFixed(2));
+  });
+
+  // Destroi o gráfico anterior para evitar sobreposição ao realizar nova consulta
+  if (meuGraficoLojas) {
+    meuGraficoLojas.destroy();
+  }
+
+  meuGraficoLojas = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: '% do Valor Líquido',
+        data: dadosPorcentagem,
+        backgroundColor: coresFundo.slice(0, labels.length),
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'right',
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return ` ${context.label}: ${context.raw}% do total líquido`;
+            }
+          }
+        }
+      }
+    }
+  });
 }
