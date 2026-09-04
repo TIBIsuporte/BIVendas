@@ -45,36 +45,43 @@
 
   <div id="resultado"></div>
 
-  <!-- CONTAINER DE CARDS BI ATUALIZADO COM O CARD DE QTDE DE VENDAS -->
-  <div class="bi-cards-container" id="biCardsContainer" style="display: none; grid-template-columns: repeat(4, 1fr);">
-    <div class="bi-card" style="border-left-color: #0275d8;">
-      <div class="bi-card-title">Valor Bruto Total</div>
-      <div class="bi-card-value" id="cardValorBruto">R$ 0,00</div>
-    </div>
-    <div class="bi-card" style="border-left-color: #d9534f;">
-      <div class="bi-card-title">Valor Desconto Total</div>
-      <div class="bi-card-value" id="cardDesconto">R$ 0,00</div>
-    </div>
-    <div class="bi-card" style="border-left-color: #5cb85c;">
-      <div class="bi-card-title">Valor Líquido Total</div>
-      <div class="bi-card-value" id="cardValorLiquido">R$ 0,00</div>
-    </div> 
-    
-    <!-- CARD DE QTDE DE VENDAS ADICIONADO NO TOPO -->
-    <div class="bi-card" style="border-left-color: #f0ad4e;">
-      <div class="bi-card-title">Qtde Vendas</div>
-      <div class="bi-card-value" id="cardQtdeVendas">0</div>
-    </div>
+<!-- CONTAINER DE CARDS BI OTIMIZADO PARA 5 COLUNAS -->
+<div class="bi-cards-container" id="biCardsContainer" style="display: none; grid-template-columns: repeat(5, 1fr); gap: 10px;">
+  
+  <div class="bi-card" style="border-left-color: #0275d8; padding: 10px;">
+    <div class="bi-card-title" style="font-size: 11px;">VALOR BRUTO TOTAL</div>
+    <div class="bi-card-value" id="cardValorBruto">R$ 0,00</div>
+  </div>
 
-    <!-- Resumo de Formas de Pagamento e Parcelas (embaixo ocupando a largura toda) -->
-    <div class="bi-card" style="border-left-color: #17a2b8; grid-column: 1 / -1;">
-      <div class="bi-card-title">Resumo de Pagamento & Parcelas</div>
-      <div class="bi-card-value" id="cardResumoPagamento" style="font-size: 14px; font-weight: normal; line-height: 1.5; text-align: left;">
-        Aguardando consulta...
-      </div>
+  <div class="bi-card" style="border-left-color: #d9534f; padding: 10px;">
+    <div class="bi-card-title" style="font-size: 11px;">VALOR DESCONTO TOTAL</div>
+    <div class="bi-card-value" id="cardDesconto">R$ 0,00</div>
+  </div>
+
+  <div class="bi-card" style="border-left-color: #5cb85c; padding: 10px;">
+    <div class="bi-card-title" style="font-size: 11px;">VALOR LÍQUIDO TOTAL</div>
+    <div class="bi-card-value" id="cardValorLiquido">R$ 0,00</div>
+  </div> 
+
+  <div class="bi-card" style="border-left-color: #f0ad4e; padding: 10px;">
+    <div class="bi-card-title" style="font-size: 11px;">QTDE VENDAS</div>
+    <div class="bi-card-value" id="cardQtdeVendas">0</div>
+  </div>
+  
+  <div class="bi-card" style="border-left-color: #6f42c1; padding: 10px;">
+    <div class="bi-card-title" style="font-size: 11px;">TICKET MÉDIO</div>
+    <div class="bi-card-value" id="cardTicketMedio">R$ 0,00</div>
+  </div>
+
+  <!-- Resumo de Formas de Pagamento e Parcelas embaixo -->
+  <div class="bi-card" style="border-left-color: #17a2b8; grid-column: 1 / -1; padding: 15px;">
+    <div class="bi-card-title">Resumo de Pagamento & Parcelas</div>
+    <div class="bi-card-value" id="cardResumoPagamento" style="font-size: 14px; font-weight: normal; line-height: 1.5; text-align: left;">
+      Aguardando consulta...
     </div>
   </div>
 
+</div>
 
   <div id="loadingOverlay" class="loading-overlay">
     <div class="spinner"></div>
