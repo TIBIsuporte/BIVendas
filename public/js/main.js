@@ -244,6 +244,7 @@ function processarDadosBI(dados, dadosPagamentos) {
   let htmlDescontoPorLoja = "";
   let htmlLiquidoPorLoja = "";
   let htmlQtdeVendasPorLoja = "";
+  let htmlTicketMedioPorLoja = "";
   let totalGeralVendasOS = 0;
 
   Object.keys(totaisPorLoja).forEach(id => {
@@ -251,12 +252,20 @@ function processarDadosBI(dados, dadosPagamentos) {
     const qtdVendasLoja = osUnicasValidasPorLoja[id] ? osUnicasValidasPorLoja[id].size : 0;
     totalGeralVendasOS += qtdVendasLoja;
 
+    // Cálculo do Ticket Médio da Loja (Líquido da Loja / Qtd de Vendas válidas da Loja)
+    const ticketMedioLoja = qtdVendasLoja > 0 ? (t.liquido / qtdVendasLoja) : 0;
+
     htmlBrutoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.bruto)}</span></div>`;
     htmlDescontoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.desconto)}</span></div>`;
     htmlLiquidoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.liquido)}</span></div>`;
     htmlQtdeVendasPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${qtdVendasLoja}</span></div>`;
+    htmlTicketMedioPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(ticketMedioLoja)}</span></div>`;
   });
 
+  // Ticket Médio Geral do Grupo
+  const ticketMedioGeral = totalGeralVendasOS > 0 ? (totalLiquidoGeral / totalGeralVendasOS) : 0;
+
+  // --- PROCESSAMENTO DA API DE PAGAMENTOS ---
   let htmlPagamentos = "";
   if (Array.isArray(dadosPagamentos) && dadosPagamentos.length > 0) {
     let pagamentosFiltrados = dadosPagamentos;
@@ -345,6 +354,7 @@ function processarDadosBI(dados, dadosPagamentos) {
     htmlPagamentos = "Nenhum registro de pagamento retornado para o período.";
   }
   
+  // Atualiza os cards no HTML
   document.getElementById("cardValorBruto").innerHTML = `${htmlBrutoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(totalBrutoGeral)}</div>`;
   document.getElementById("cardDesconto").innerHTML = `${htmlDescontoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(totalDescontoGeral)}</div>`;
   document.getElementById("cardValorLiquido").innerHTML = `${htmlLiquidoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(totalLiquidoGeral)}</div>`;
@@ -352,6 +362,11 @@ function processarDadosBI(dados, dadosPagamentos) {
   const cardQtdeVendasEl = document.getElementById("cardQtdeVendas");
   if (cardQtdeVendasEl) {
     cardQtdeVendasEl.innerHTML = `${htmlQtdeVendasPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">Total vendas: ${totalGeralVendasOS}</div>`;
+  }
+
+  const cardTicketMedioEl = document.getElementById("cardTicketMedio");
+  if (cardTicketMedioEl) {
+    cardTicketMedioEl.innerHTML = `${htmlTicketMedioPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">Ticket Médio: ${formatarMoedaBR(ticketMedioGeral)}</div>`;
   }
 
   document.getElementById("cardResumoPagamento").innerHTML = htmlPagamentos;
