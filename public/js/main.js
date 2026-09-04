@@ -60,8 +60,13 @@ function abrirModalLojas() {
   const inputFiltro = document.getElementById("inputFiltroGerenteModal");
   if (inputFiltro) inputFiltro.value = "";
   renderizarListaLojasModal(lojasDisponiveis);
+  
   const modal = document.getElementById("modalLojas");
-  if (modal) modal.style.display = "flex";
+  if (modal) {
+    modal.style.display = "flex";
+  } else {
+    console.error("Elemento modalLojas não encontrado no HTML!");
+  }
 }
 
 function renderizarListaLojasModal(lista) {
@@ -403,11 +408,11 @@ function processarDadosBI(dados, dadosPagamentos) {
   document.getElementById("biCardsContainer").style.display = "flex";
   mudarAba('cards');
 
-  // --- RENDERIZAÇÃO DO DASHBOARD (GRÁFICO + RANKING DE DESCONTOS) ---
+  // --- RENDERIZAÇÃO DO DASHBOARD ---
   renderizarDashboard(totaisPorLoja, totalLiquidoGeral);
 }
 
-// --- FUNÇÃO PARA RENDERIZAR O DASHBOARD (Gráfico com Total, Ranking de Vendas e Ranking de Descontos) ---
+// --- FUNÇÃO PARA RENDERIZAR O DASHBOARD ---
 function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
   
   // 1. Processa os dados ordenados por Faturamento/Líquido (Do maior para o menor)
@@ -471,7 +476,7 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
     });
   }
 
-  // 3. Renderiza o Ranking de Vendas por Colocações (Esquerda/Abaixo do Gráfico)
+  // 3. Renderiza o Ranking de Vendas por Colocações (Esquerda)
   const containerRankingVendas = document.getElementById('rankingVendasContainer');
   if (containerRankingVendas) {
     let htmlRankingVendas = "";
