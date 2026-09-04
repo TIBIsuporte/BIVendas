@@ -232,7 +232,7 @@ function processarDadosBI(dados, dadosPagamentos) {
     htmlLiquidoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.liquido)}</span></div>`;
   });
 
-// --- 2. PROCESSAMENTO E AGRUPAMENTO DA API DE PAGAMENTOS POR LOJA ---
+  // --- 2. PROCESSAMENTO E AGRUPAMENTO DA API DE PAGAMENTOS POR LOJA ---
   let htmlPagamentos = "";
   if (Array.isArray(dadosPagamentos) && dadosPagamentos.length > 0) {
     let pagamentosFiltrados = dadosPagamentos;
@@ -251,7 +251,6 @@ function processarDadosBI(dados, dadosPagamentos) {
     }
 
     if (pagamentosFiltrados.length > 0) {
-      // Estrutura para agrupar: { "MEIO|PARCELAS": { meioPagamento, nParcelas, lojas: { "520": {valor, qtd}, "521": {valor, qtd} } } }
       const agrupadoPagamentos = {};
 
       pagamentosFiltrados.forEach(pgto => {
@@ -259,7 +258,6 @@ function processarDadosBI(dados, dadosPagamentos) {
         const parcelas = (pgto.N_PARCELAS || "1").trim();
         const chave = `${meio}|${parcelas}`;
 
-        // Extrai o ID da loja do registro de pagamento
         const textoLojaPgto = String(pgto.LOJA || pgto.CODIGOLOJA || "Geral").trim();
         const matchLojaPgto = textoLojaPgto.match(/^0*(\d+)/);
         const idLoja = matchLojaPgto ? matchLojaPgto[1] : textoLojaPgto;
@@ -283,12 +281,18 @@ function processarDadosBI(dados, dadosPagamentos) {
         agrupadoPagamentos[chave].lojas[idLoja].vendasValor += valorTotalPgto;
       });
 
-      // Gera o HTML formatado igual ao seu desenho
+      // Gera o HTML com a totalização no topo do bloco e o detalhamento por loja embaixo
       htmlPagamentos = Object.values(agrupadoPagamentos).map(item => {
         
-        // Gera as linhas de cada loja para este meio/parcela
+        let totalGeralValorGrupo = 0;
+        let totalGeralQtdGrupo = 0;
+
         let linhasLojasHTML = Object.keys(item.lojas).map(idLoja => {
           const dadosLoja = item.lojas[idLoja];
+          
+          totalGeralValorGrupo += dadosLoja.vendasValor;
+          totalGeralQtdGrupo += dadosLoja.quantidadeVendas;
+
           return `
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px dashed #eee; font-size: 13px;">
               <span style="font-weight: bold; min-width: 50px;">${idLoja}</span>
@@ -300,8 +304,11 @@ function processarDadosBI(dados, dadosPagamentos) {
 
         return `
           <div style="margin-bottom: 15px; background: #fafafa; padding: 10px; border-radius: 6px; border: 1px solid #eee;">
-            <div style="font-size: 13px; font-weight: bold; color: #0078d7; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 4px;">
-              Meio Pagamento: ${item.meioPagamento} &nbsp;|&nbsp; Parcelas: ${item.nParcelas}
+            <div style="font-size: 13px; font-weight: bold; color: #333; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 4px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+              <span>Meio Pagamento: <strong style="color: #0078d7;">${item.meioPagamento}</strong></span>
+              <span>Parcelas: <strong style="color: #0078d7;">${item.nParcelas}</strong></span>
+              <span>Total vendas: <strong>${totalGeralQtdGrupo}</strong></span>
+              <span>Valor Total: <strong style="color: #0078d7;">${formatarMoedaBR(totalGeralValorGrupo)}</strong></span>
             </div>
             <div style="display: flex; flex-direction: column; gap: 2px;">
               ${linhasLojasHTML}
@@ -320,7 +327,7 @@ function processarDadosBI(dados, dadosPagamentos) {
   // --- 3. ATUALIZAÇÃO DOS CARDS NO HTML ---
   document.getElementById("cardValorBruto").innerHTML = `${htmlBrutoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(totalBrutoGeral)}</div>`;
   document.getElementById("cardDesconto").innerHTML = `${htmlDescontoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(totalDescontoGeral)}</div>`;
-  document.getElementById("cardValorLiquido").innerHTML = `${htmlLiquidoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(formatarMoedaBR ? totalLiquidoGeral : totalLiquidoGeral)}</div>`;
+  document.getElementById("cardValorLiquido").innerHTML = `${htmlLiquidoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(totalLiquidoGeral)}</div>`;
   document.getElementById("cardResumoPagamento").innerHTML = htmlPagamentos;
 
   document.getElementById("biCardsContainer").style.display = "grid";
