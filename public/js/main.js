@@ -198,14 +198,45 @@ function processarDadosBI(dados, dadosPagamentos) {
   let totalDescontoGeral = 0;
   let totalLiquidoGeral = 0;
 
-  // --- 1. LOOP DE SOMA DOS PRODUTOS POR O.S. (API ProdutosPorOSGRID) ---
+  // Objeto para armazenar os totais separados por ID de Loja (Desejado na Imagem 2)
+  const totaisPorLoja = {};
+
+  // --- 1. LOOP DE SOMA E DETALHAMENTO POR LOJA (API ProdutosPorOSGRID) ---
   dadosFiltrados.forEach((item) => {
-    totalBrutoGeral += parseNumeroBR(item.VALORBRUTOPRODUTO);
-    totalDescontoGeral += parseNumeroBR(item.DESCPRODUTO);
-    totalLiquidoGeral += parseNumeroBR(item.LIQUIDOPRODUTO);
+    const bruto = parseNumeroBR(item.VALORBRUTOPRODUTO);
+    const desconto = parseNumeroBR(item.DESCPRODUTO);
+    const liquido = parseNumeroBR(item.LIQUIDOPRODUTO);
+
+    totalBrutoGeral += bruto;
+    totalDescontoGeral += desconto;
+    totalLiquidoGeral += liquido;
+
+    // Extrai o código da loja para o detalhamento individual
+    const textoLoja = String(item.LOJANOME ?? item.CODIGOLOJA ?? item.LOJA ?? "").trim();
+    const matchLoja = textoLoja.match(/^0*(\d+)/);
+    const idLoja = matchLoja ? matchLoja[1] : textoLoja;
+
+    if (!totaisPorLoja[idLoja]) {
+      totaisPorLoja[idLoja] = { bruto: 0, desconto: 0, liquido: 0 };
+    }
+    totaisPorLoja[idLoja].bruto += bruto;
+    totaisPorLoja[idLoja].desconto += desconto;
+    totaisPorLoja[idLoja].liquido += liquido;
   });
 
-// --- 2. PROCESSAMENTO E AGRUPAMENTO DA API DE PAGAMENTOS ---
+  // Gera o HTML interno para exibir os valores detalhados por loja no topo de cada card
+  let htmlBrutoPorLoja = "";
+  let htmlDescontoPorLoja = "";
+  let htmlLiquidoPorLoja = "";
+
+  Object.keys(totaisPorLoja).forEach(id => {
+    const t = totaisPorLoja[id];
+    htmlBrutoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.bruto)}</span></div>`;
+    htmlDescontoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.desconto)}</span></div>`;
+    htmlLiquidoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.liquido)}</span></div>`;
+  });
+
+  // --- 2. PROCESSAMENTO E AGRUPAMENTO DA API DE PAGAMENTOS ---
   let htmlPagamentos = "";
   if (Array.isArray(dadosPagamentos) && dadosPagamentos.length > 0) {
     let pagamentosFiltrados = dadosPagamentos;
@@ -269,11 +300,10 @@ function processarDadosBI(dados, dadosPagamentos) {
     htmlPagamentos = "Nenhum registro de pagamento retornado para o período.";
   }
 
-  
-  // --- 3. ATUALIZAÇÃO DOS CARDS NO HTML ---
-  document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);
-  document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);
-  document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoGeral);
+  // --- 3. ATUALIZAÇÃO DOS CARDS NO HTML COM DETALHAMENTO E TOTAIS ---
+  document.getElementById("cardValorBruto").innerHTML = `${htmlBrutoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(totalBrutoGeral)}</div>`;
+  document.getElementById("cardDesconto").innerHTML = `${htmlDescontoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(totalDescontoGeral)}</div>`;
+  document.getElementById("cardValorLiquido").innerHTML = `${htmlLiquidoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(totalLiquidoGeral)}</div>`;
   document.getElementById("cardResumoPagamento").innerHTML = htmlPagamentos;
 
   document.getElementById("biCardsContainer").style.display = "grid";
