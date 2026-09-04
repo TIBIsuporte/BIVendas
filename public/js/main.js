@@ -1,7 +1,7 @@
 /**
  * Módulo Principal de Execução e Regras de Negócio do BI
  * Gerencia o carregamento de lojas, o envio de requisições paralelas para as APIs
- * e a renderização completa dos Cards de Indicadores (sem a grid inferior).
+ * e a renderização completa com suporte a abas.
  */
 
 const SUPABASE_URL = 'https://cwmofpwuihrnifsvqhik.supabase.co';
@@ -13,6 +13,32 @@ let lojasDisponiveis = [];
 window.onload = async () => {
   await carregarLojasSupabase();
 };
+
+// --- FUNÇÃO DE CONTROLE DE ABAS ---
+function mudarAba(aba) {
+  const btnCards = document.getElementById("btnAbaCards");
+  const btnGraficos = document.getElementById("btnAbaGraficos");
+  const conteudoCards = document.getElementById("conteudoAbaCards");
+  const conteudoGraficos = document.getElementById("conteudoAbaGraficos");
+
+  if (aba === 'cards') {
+    conteudoCards.style.display = "flex";
+    conteudoGraficos.style.display = "none";
+    
+    btnCards.style.background = "#0078d7";
+    btnCards.style.color = "#fff";
+    btnGraficos.style.background = "#e0e0e0";
+    btnGraficos.style.color = "#333";
+  } else {
+    conteudoCards.style.display = "none";
+    conteudoGraficos.style.display = "flex";
+    
+    btnGraficos.style.background = "#0078d7";
+    btnGraficos.style.color = "#fff";
+    btnCards.style.background = "#e0e0e0";
+    btnCards.style.color = "#333";
+  }
+}
 
 // --- FUNÇÕES DO MODAL DE LOJAS ---
 async function carregarLojasSupabase() {
@@ -159,6 +185,7 @@ async function consultar() {
     if (containerResultado) {
       containerResultado.innerHTML = "<p class='erro'>" + error.message + "</p>";
     }
+    document.getElementById("biTabsHeader").style.display = "none";
     document.getElementById("biCardsContainer").style.display = "none";
   } finally {
     document.getElementById("loadingOverlay").style.display = "none";
@@ -167,6 +194,7 @@ async function consultar() {
 
 function processarDadosBI(dados, dadosPagamentos) {
   if (!dados || dados.length === 0) {
+    document.getElementById("biTabsHeader").style.display = "none";
     document.getElementById("biCardsContainer").style.display = "none";
     return;
   }
@@ -252,17 +280,15 @@ function processarDadosBI(dados, dadosPagamentos) {
     const qtdVendasLoja = osUnicasValidasPorLoja[id] ? osUnicasValidasPorLoja[id].size : 0;
     totalGeralVendasOS += qtdVendasLoja;
 
-    // Cálculo do Ticket Médio da Loja (Líquido da Loja / Qtd de Vendas válidas da Loja)
     const ticketMedioLoja = qtdVendasLoja > 0 ? (t.liquido / qtdVendasLoja) : 0;
 
-    htmlBrutoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.bruto)}</span></div>`;
-    htmlDescontoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.desconto)}</span></div>`;
-    htmlLiquidoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.liquido)}</span></div>`;
-    htmlQtdeVendasPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${qtdVendasLoja}</span></div>`;
-    htmlTicketMedioPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(ticketMedioLoja)}</span></div>`;
+    htmlBrutoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 12px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.bruto)}</span></div>`;
+    htmlDescontoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 12px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.desconto)}</span></div>`;
+    htmlLiquidoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 12px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.liquido)}</span></div>`;
+    htmlQtdeVendasPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 12px;"><span><strong>${id}</strong></span> <span>${qtdVendasLoja}</span></div>`;
+    htmlTicketMedioPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 12px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(ticketMedioLoja)}</span></div>`;
   });
 
-  // Ticket Médio Geral do Grupo
   const ticketMedioGeral = totalGeralVendasOS > 0 ? (totalLiquidoGeral / totalGeralVendasOS) : 0;
 
   // --- PROCESSAMENTO DA API DE PAGAMENTOS ---
@@ -355,20 +381,24 @@ function processarDadosBI(dados, dadosPagamentos) {
   }
   
   // Atualiza os cards no HTML
-  document.getElementById("cardValorBruto").innerHTML = `${htmlBrutoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(totalBrutoGeral)}</div>`;
-  document.getElementById("cardDesconto").innerHTML = `${htmlDescontoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(totalDescontoGeral)}</div>`;
-  document.getElementById("cardValorLiquido").innerHTML = `${htmlLiquidoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(totalLiquidoGeral)}</div>`;
+  document.getElementById("cardValorBruto").innerHTML = `${htmlBrutoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 15px; font-weight: bold;">${formatarMoedaBR(totalBrutoGeral)}</div>`;
+  document.getElementById("cardDesconto").innerHTML = `${htmlDescontoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 15px; font-weight: bold;">${formatarMoedaBR(totalDescontoGeral)}</div>`;
+  document.getElementById("cardValorLiquido").innerHTML = `${htmlLiquidoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 15px; font-weight: bold;">${formatarMoedaBR(totalLiquidoGeral)}</div>`;
   
   const cardQtdeVendasEl = document.getElementById("cardQtdeVendas");
   if (cardQtdeVendasEl) {
-    cardQtdeVendasEl.innerHTML = `${htmlQtdeVendasPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">Total vendas: ${totalGeralVendasOS}</div>`;
+    cardQtdeVendasEl.innerHTML = `${htmlQtdeVendasPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 15px; font-weight: bold;">Total vendas: ${totalGeralVendasOS}</div>`;
   }
 
   const cardTicketMedioEl = document.getElementById("cardTicketMedio");
   if (cardTicketMedioEl) {
-    cardTicketMedioEl.innerHTML = `${htmlTicketMedioPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">Ticket Médio: ${formatarMoedaBR(ticketMedioGeral)}</div>`;
+    cardTicketMedioEl.innerHTML = `${htmlTicketMedioPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 15px; font-weight: bold;">Ticket Médio: ${formatarMoedaBR(ticketMedioGeral)}</div>`;
   }
 
   document.getElementById("cardResumoPagamento").innerHTML = htmlPagamentos;
-  document.getElementById("biCardsContainer").style.display = "grid";
+  
+  // Exibe os botões de abas e o container mantendo a aba de cards ativa por padrão
+  document.getElementById("biTabsHeader").style.display = "flex";
+  document.getElementById("biCardsContainer").style.display = "flex";
+  mudarAba('cards');
 }
