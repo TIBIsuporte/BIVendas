@@ -208,14 +208,35 @@ function processarDadosBI(dados, dadosPagamentos) {
   // --- 2. PROCESSAMENTO DA API DE PAGAMENTOS (APIVendaResumoTodasFormasPagamento) ---
   let htmlPagamentos = "";
   if (Array.isArray(dadosPagamentos) && dadosPagamentos.length > 0) {
-    htmlPagamentos = dadosPagamentos.map(pgto => {
-      const meio = pgto.MEIOPAGAMENTO || pgto.FORMAPAGAMENTO || pgto.MEIO || "Não especificado";
-      const parcelas = pgto.N_PARCELAS || pgto.PARCELAS || pgto.NPARCELAS || "1";
-      const qtdVendas = parseNumeroBR(pgto.CONTADOR || pgto.QTDVENDAS || pgto.QUANTIDADE || 1);
-      const valorTotalPgto = parseNumeroBR(pgto.VENDASVALOR || pgto.VALOR || pgto.VALORTOTAL || 0);
+    let pagamentosFiltrados = dadosPagamentos;
+    if (lojasDigitadas) {
+      const idsFiltro = lojasDigitadas.split(",").map(id => id.trim());
+      pagamentosFiltrados = dadosPagamentos.filter(pgto => {
+        const textoLojaPgto = String(pgto.LOJA || "").trim();
+        const matchPgto = textoLojaPgto.match(/^0*(\d+)/);
+        const codPgto = matchPgto ? matchPgto[1] : textoLojaPgto;
+        const codPgtoSemZero = matchPgto ? String(parseInt(matchPgto[1], 10)) : codPgto;
 
-      return `<div><strong>Meio Pagamento:</strong> ${meio} | <strong>Parcelas:</strong> ${parcelas} | <strong>Total vendas:</strong> ${qtdVendas} | <strong>Valor Total:</strong> ${formatarMoedaBR(valorTotalPgto)}</div>`;
-    }).join("<hr style='border:0; border-top:1px dashed #ccc; margin:6px 0;'>");
+        return idsFiltro.includes(codPgto) || 
+               idsFiltro.includes(codPgtoSemZero) || 
+               idsFiltro.some(id => textoLojaPgto.toLowerCase().includes(id.toLowerCase()));
+      });
+    }
+
+    if (pagamentosFiltrados.length > 0) {
+      htmlPagamentos = pagamentosFiltrados.map(pgto => {
+        const meio = pgto.MEIO_PAGAMENTO || pgto.MEIOPAGAMENTO || "Não especificado";
+        const bandeira = pgto.BANDEIRA_CARTAO ? ` (${pgto.BANDEIRA_CARTAO})` : "";
+        const forma = pgto.FORMA_PAGAMENTO ? ` - ${pgto.FORMA_PAGAMENTO}` : "";
+        const parcelas = pgto.N_PARCELAS || "1";
+        const qtdUso = parseNumeroBR(pgto.QTDE_USO || 1);
+        const valorTotalPgto = parseNumeroBR(pgto.VENDAS_VALOR || 0);
+
+        return `<div style="margin-bottom: 4px;"><strong>${meio}${bandeira}${forma}</strong><br>Parcelas: ${parcelas} | Qtd: ${qtdUso} | Total: ${formatarMoedaBR(valorTotalPgto)}</div>`;
+      }).join("<hr style='border:0; border-top:1px dashed #ccc; margin:6px 0;'>");
+    } else {
+      htmlPagamentos = "Nenhum registro de pagamento para a(s) loja(s) selecionada(s).";
+    }
   } else {
     htmlPagamentos = "Nenhum registro de pagamento retornado para o período.";
   }
