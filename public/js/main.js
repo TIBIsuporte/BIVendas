@@ -1,3 +1,9 @@
+/**
+ * Módulo Principal de Execução e Regras de Negócio do BI
+ * Gerencia o carregamento de lojas, o envio de requisições paralelas para as APIs
+ * e a renderização completa da Grid e dos Cards de Indicadores.
+ */
+
 const SUPABASE_URL = 'https://cwmofpwuihrnifsvqhik.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_biWjIRo9x6maeZXcoKX6Lw_l-fjV0wP';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -196,7 +202,7 @@ function processarDadosBI(dados, dadosDevolucoes) {
   console.group("🔍 [DEBUG] Analisando itens da API Principal");
 
   // --- 1. PROCESSAMENTO DA API PRINCIPAL (ProdutosPorOSGRID) ---
-  dadosFiltrados.forEach((item, index) => {
+  dadosFiltrados.forEach((item) => {
     const osId = String(item.OS || item.CODIGODAVENDA || "").trim();
     if (osId) osSet.add(osId);
 
@@ -209,13 +215,9 @@ function processarDadosBI(dados, dadosDevolucoes) {
     totalDescontoGeral += descItem;
     totalLiquidoTabela += liquidoItem;
 
-    // Log individual se for TROCA para inspecionar os campos
     if (tipoVendaPrincipal === "TROCA") {
-      console.log(`[TROCA ENCONTRADA] OS: ${osId} | TIPOVENDA: ${tipoVendaPrincipal} | LIQUIDO: ${liquidoItem} | DESCONTOVENDA: ${item.DESCONTOVENDA}`, item);
-      
-      // Aqui testamos a captura do valor da troca
       let valorTroca = parseNumeroBR(item.DESCONTOVENDA || item.LIQUIDOPRODUTO || 0);
-      if (valorTroca > 0) valorTroca = -valorTroca; // Mantém negativo para abater corretamente
+      if (valorTroca > 0) valorTroca = -valorTroca;
       totalDevolucaoGeral += valorTroca;
     }
   });
@@ -249,7 +251,6 @@ function processarDadosBI(dados, dadosDevolucoes) {
       let valorDevolucaoItem = parseNumeroBR(itemDev.LIQUIDOPRODUTO || itemDev.VALORBRUTOPRODUTO || itemDev.PRECOTOTALPRODUTO || 0);
       if (valorDevolucaoItem > 0) valorDevolucaoItem = -valorDevolucaoItem;
       
-      console.log(`[DEVOLUÇÃO ENCONTRADA] Valor: ${valorDevolucaoItem}`, itemDev);
       totalDevolucaoGeral += valorDevolucaoItem;
     });
   }
@@ -259,13 +260,6 @@ function processarDadosBI(dados, dadosDevolucoes) {
   let totalLiquidoFinal = totalLiquidoTabela + totalDevolucaoGeral;
   let qtdeVendasGeral = osSet.size;
 
-  console.log("📊 [RESUMO FINAL DOS CÁLCULOS]");
-  console.log("Total Bruto:", totalBrutoGeral);
-  console.log("Total Desconto:", totalDescontoGeral);
-  console.log("Total Líquido da Tabela:", totalLiquidoTabela);
-  console.log("Total Devolução/Troca Acumulado:", totalDevolucaoGeral);
-  console.log("Total Líquido Final (Tabela + Devolução Negativa):", totalLiquidoFinal);
-
   document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);
   document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);
   document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoFinal);
@@ -274,6 +268,7 @@ function processarDadosBI(dados, dadosDevolucoes) {
 
   document.getElementById("biCardsContainer").style.display = "grid";
 }
+
 function renderizarGridTodosCampos(dados) {
   const thead = document.getElementById("cabecalhoTabela");
   const tbody = document.getElementById("corpoTabela");
@@ -331,7 +326,7 @@ function renderizarGridTodosCampos(dados) {
   COLUNAS_VALORES_TOTALIZAR.forEach(col => totais[col] = 0);
 
   console.group("📋 [INSPEÇÃO DE COLUNAS E TOTALIZAÇÃO DA TABELA]");
-  dadosFiltrados.forEach((item, index) => {
+  dadosFiltrados.forEach((item) => {
     let tr = document.createElement("tr");
     colunas.forEach(coluna => {
       let td = document.createElement("td");
@@ -348,7 +343,6 @@ function renderizarGridTodosCampos(dados) {
     });
     tbody.appendChild(tr);
   });
-  console.log("Valores Finais Somados por Variável na Tabela:", totais);
   console.groupEnd();
 
   let trFoot = document.createElement("tr");
