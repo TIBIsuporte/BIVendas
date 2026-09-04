@@ -403,10 +403,11 @@ function processarDadosBI(dados, dadosPagamentos) {
   document.getElementById("biCardsContainer").style.display = "flex";
   mudarAba('cards');
 
-  // --- RENDERIZAÇÃO DO DASHBOARD (GRÁFICO + RANKING DE DESCONTOS) ---
+  // --- RENDERIZAÇÃO DO DASHBOARD (GRÁFICO + RANKINGS) ---
   renderizarDashboard(totaisPorLoja, totalLiquidoGeral);
 }
-// --- FUNÇÃO PARA RENDERIZAR O DASHBOARD (Gráfico Rosca + Total Centro + Dois Rankings) ---
+
+// --- FUNÇÃO PARA RENDERIZAR O DASHBOARD ---
 function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
   
   // 1. Processa e ordena as lojas da maior participação/líquido para a menor
@@ -424,10 +425,9 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
     };
   });
 
-  // Ordena rigorosamente do maior líquido para o menor (para o gráfico e ranking de composição)
   listaLojasOrdenadas.sort((a, b) => b.liquido - a.liquido);
 
-  // 2. Renderiza o Gráfico de Rosca com o Valor Total no Centro
+  // 2. Renderiza o Gráfico de Rosca com correção de centralização do texto
   const ctx = document.getElementById('graficoParticipacaoLojas');
   if (ctx) {
     const labels = listaLojasOrdenadas.map(item => `Loja ${item.idLoja}`);
@@ -441,32 +441,33 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
       meuGraficoLojas.destroy();
     }
 
-    // Plugin para desenhar o Total Líquido no centro da rosca
     const centroTotalPlugin = {
       id: 'centroTotalPlugin',
       beforeDraw: function(chart) {
-        const width = chart.width;
         const height = chart.height;
+        const chartArea = chart.chartArea;
         const ctx = chart.ctx;
         ctx.restore();
         
-        const fontSize = (height / 114).toFixed(2);
+        // Centro exato considerando a área útil do gráfico (ignorando a legenda lateral)
+        const centerX = (chartArea.left + chartArea.right) / 2;
+        const centerY = (chartArea.top + chartArea.bottom) / 2;
+        
+        const fontSize = (height / 130).toFixed(2);
         ctx.font = `bold ${fontSize}em sans-serif`;
         ctx.textBaseline = 'middle';
+        ctx.textAlign = 'center';
         ctx.fillStyle = '#333';
 
         const textoPrincipal = formatarMoedaBR(totalLiquidoGeral);
         const textoSub = "Total Líquido";
-        
-        const textX = Math.round((width - ctx.measureText(textoPrincipal).width) / 2);
-        const textY = height / 2 - 8;
 
-        ctx.fillText(textoPrincipal, textX > 0 ? textX : 50, textY);
+        // Desenha valor e subtítulo perfeitamente centralizados no miolo da rosca
+        ctx.fillText(textoPrincipal, centerX, centerY - 10);
 
         ctx.font = `bold ${fontSize * 0.45}em sans-serif`;
         ctx.fillStyle = '#666';
-        const subX = Math.round((width - ctx.measureText(textoSub).width) / 2);
-        ctx.fillText(textoSub, subX > 0 ? subX : 50, textY + 22);
+        ctx.fillText(textoSub, centerX, centerY + 16);
         
         ctx.save();
       }
@@ -502,30 +503,27 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
     });
   }
 
-  // 3. Renderiza o Ranking de Vendas por Composição (Lojas ordenadas por participação)
+  // 3. Renderiza o Ranking de Vendas por Composição
   const containerRankingVendas = document.getElementById('rankingVendasContainer');
   if (containerRankingVendas) {
     let htmlRankingVendas = "";
     listaLojasOrdenadas.forEach((item, index) => {
-      let posicaoBadge = `#${index + 1}`;
+      let iconePosicao = "";
       let corBadge = "#666";
       
-      if (index === 0) { corBadge = "#d4af37"; posicaoBadge = "🏆 1º"; } 
-      else if (index === 1) { corBadge = "#aaa"; posicaoBadge = "🥈 2º"; }
-      else if (index === 2) { corBadge = "#cd7f32"; posicaoBadge = "🥉 3º"; }
+      if (index === 0) { iconePosicao = "🏆 "; corBadge = "#d4af37"; } 
+      else if (index === 1) { iconePosicao = "🥈 "; corBadge = "#aaa"; }
+      else if (index === 2) { iconePosicao = "🥉 "; corBadge = "#cd7f32"; }
 
-      // Do 4º em diante sem emojis/medalhas, apenas o número limpo
-      if (index >= 3) {
-        posicaoBadge = `#${index + 1}`;
-        corBadge = index === 3 || index === 4 ? "#333" : "#666";
-      }
+      let textoIdentificacao = `${iconePosicao}Loja ${item.idLoja}`;
+      let posicaoNumero = `#${index + 1}`;
 
       htmlRankingVendas += `
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; margin-bottom: 6px; background: #fff; border: 1px solid #e0e0e0; border-radius: 6px;">
           <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-weight: bold; color: ${corBadge}; font-size: 13px; min-width: 45px;">${posicaoBadge}</span>
+            <span style="font-weight: bold; color: ${index < 3 ? corBadge : '#333'}; font-size: 13px; min-width: 35px;">${posicaoNumero}</span>
             <div>
-              <strong>Loja ${item.idLoja}</strong>
+              <strong style="color: ${corBadge};">${textoIdentificacao}</strong>
               <div style="font-size: 11px; color: #666;">Composição: ${item.participacao.toFixed(1)}% do total</div>
             </div>
           </div>
@@ -539,31 +537,29 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
     containerRankingVendas.innerHTML = htmlRankingVendas || "Nenhum dado para o ranking.";
   }
 
-  // 4. Renderiza o Ranking de Descontos Proporcionais (Lado Direito)
+  // 4. Renderiza o Ranking de Descontos Proporcionais
   const containerRankingDescontos = document.getElementById('rankingDescontosContainer');
   if (containerRankingDescontos) {
     const listaRankingDesconto = [...listaLojasOrdenadas].sort((a, b) => b.taxaDesconto - a.taxaDesconto);
 
     let htmlRankingDesc = "";
     listaRankingDesconto.forEach((item, index) => {
-      let posicaoBadge = `#${index + 1}`;
+      let iconePosicao = "";
       let corBadge = "#666";
       
-      if (index === 0) { corBadge = "#d4af37"; posicaoBadge = "🏆 1º"; } 
-      else if (index === 1) { corBadge = "#aaa"; posicaoBadge = "🥈 2º"; }
-      else if (index === 2) { corBadge = "#cd7f32"; posicaoBadge = "🥉 3º"; }
+      if (index === 0) { iconePosicao = "🏆 "; corBadge = "#d4af37"; } 
+      else if (index === 1) { iconePosicao = "🥈 "; corBadge = "#aaa"; }
+      else if (index === 2) { iconePosicao = "🥉 "; corBadge = "#cd7f32"; }
 
-      if (index >= 3) {
-        posicaoBadge = `#${index + 1}`;
-        corBadge = index === 3 || index === 4 ? "#333" : "#666";
-      }
+      let textoIdentificacao = `${iconePosicao}Loja ${item.idLoja}`;
+      let posicaoNumero = `#${index + 1}`;
 
       htmlRankingDesc += `
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; margin-bottom: 6px; background: #fff; border: 1px solid #e0e0e0; border-radius: 6px;">
           <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-weight: bold; color: ${corBadge}; font-size: 13px; min-width: 45px;">${posicaoBadge}</span>
+            <span style="font-weight: bold; color: ${index < 3 ? corBadge : '#333'}; font-size: 13px; min-width: 35px;">${posicaoNumero}</span>
             <div>
-              <strong>Loja ${item.idLoja}</strong>
+              <strong style="color: ${corBadge};">${textoIdentificacao}</strong>
               <div style="font-size: 11px; color: #666;">Desc: ${formatarMoedaBR(item.desconto)} / Bruto: ${formatarMoedaBR(item.bruto)}</div>
             </div>
           </div>
