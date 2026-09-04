@@ -232,14 +232,14 @@ function processarDadosBI(dados, dadosPagamentos) {
     htmlLiquidoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.liquido)}</span></div>`;
   });
 
-  // --- 2. PROCESSAMENTO E AGRUPAMENTO DA API DE PAGAMENTOS ---
+// --- 2. PROCESSAMENTO E AGRUPAMENTO DA API DE PAGAMENTOS POR LOJA ---
   let htmlPagamentos = "";
   if (Array.isArray(dadosPagamentos) && dadosPagamentos.length > 0) {
     let pagamentosFiltrados = dadosPagamentos;
     if (lojasDigitadas) {
       const idsFiltro = lojasDigitadas.split(",").map(id => id.trim());
       pagamentosFiltrados = dadosPagamentos.filter(pgto => {
-        const textoLojaPgto = String(pgto.LOJA || "").trim();
+        const textoLojaPgto = String(pgto.LOJA || pgto.CODIGOLOJA || "").trim();
         const matchPgto = textoLojaPgto.match(/^0*(\d+)/);
         const codPgto = matchPgto ? matchPgto[1] : textoLojaPgto;
         const codPgtoSemZero = matchPgto ? String(parseInt(matchPgto[1], 10)) : codPgto;
@@ -251,40 +251,64 @@ function processarDadosBI(dados, dadosPagamentos) {
     }
 
     if (pagamentosFiltrados.length > 0) {
-      const agrupado = {};
+      // Estrutura para agrupar: { "MEIO|PARCELAS": { meioPagamento, nParcelas, lojas: { "520": {valor, qtd}, "521": {valor, qtd} } } }
+      const agrupadoPagamentos = {};
 
       pagamentosFiltrados.forEach(pgto => {
         const meio = (pgto.MEIO_PAGAMENTO || pgto.MEIOPAGAMENTO || "NÃO ESPECIFICADO").trim();
         const parcelas = (pgto.N_PARCELAS || "1").trim();
-        
         const chave = `${meio}|${parcelas}`;
+
+        // Extrai o ID da loja do registro de pagamento
+        const textoLojaPgto = String(pgto.LOJA || pgto.CODIGOLOJA || "Geral").trim();
+        const matchLojaPgto = textoLojaPgto.match(/^0*(\d+)/);
+        const idLoja = matchLojaPgto ? matchLojaPgto[1] : textoLojaPgto;
 
         const qtdUso = parseNumeroBR(pgto.QTDE_USO || 1);
         const valorTotalPgto = parseNumeroBR(pgto.VENDAS_VALOR || 0);
 
-        if (!agrupado[chave]) {
-          agrupado[chave] = {
+        if (!agrupadoPagamentos[chave]) {
+          agrupadoPagamentos[chave] = {
             meioPagamento: meio,
             nParcelas: parcelas,
-            quantidadeVendas: 0,
-            vendasValor: 0
+            lojas: {}
           };
         }
 
-        agrupado[chave].quantidadeVendas += qtdUso;
-        agrupado[chave].vendasValor += valorTotalPgto;
+        if (!agrupadoPagamentos[chave].lojas[idLoja]) {
+          agrupadoPagamentos[chave].lojas[idLoja] = { quantidadeVendas: 0, vendasValor: 0 };
+        }
+
+        agrupadoPagamentos[chave].lojas[idLoja].quantidadeVendas += qtdUso;
+        agrupadoPagamentos[chave].lojas[idLoja].vendasValor += valorTotalPgto;
       });
 
-      htmlPagamentos = Object.values(agrupado).map(item => {
+      // Gera o HTML formatado igual ao seu desenho
+      htmlPagamentos = Object.values(agrupadoPagamentos).map(item => {
+        
+        // Gera as linhas de cada loja para este meio/parcela
+        let linhasLojasHTML = Object.keys(item.lojas).map(idLoja => {
+          const dadosLoja = item.lojas[idLoja];
+          return `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px dashed #eee; font-size: 13px;">
+              <span style="font-weight: bold; min-width: 50px;">${idLoja}</span>
+              <span style="color: #333;">${formatarMoedaBR(dadosLoja.vendasValor)}</span>
+              <span style="color: #666; font-size: 12px;">Qtde: <strong>${dadosLoja.quantidadeVendas}</strong></span>
+            </div>
+          `;
+        }).join("");
+
         return `
-          <div style="margin-bottom: 8px;">
-            <strong>Meio Pagamento:</strong> ${item.meioPagamento}<br>
-            <strong>Parcelas:</strong> ${item.nParcelas}<br>
-            <strong>Total vendas:</strong> ${item.quantidadeVendas}<br>
-            <strong>Valor Total:</strong> ${formatarMoedaBR(item.vendasValor)}
+          <div style="margin-bottom: 15px; background: #fafafa; padding: 10px; border-radius: 6px; border: 1px solid #eee;">
+            <div style="font-size: 13px; font-weight: bold; color: #0078d7; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 4px;">
+              Meio Pagamento: ${item.meioPagamento} &nbsp;|&nbsp; Parcelas: ${item.nParcelas}
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              ${linhasLojasHTML}
+            </div>
           </div>
         `;
-      }).join("<hr style='border:0; border-top:1px dashed #ccc; margin:8px 0;'>");
+      }).join("");
 
     } else {
       htmlPagamentos = "Nenhum registro de pagamento para a(s) loja(s) selecionada(s).";
@@ -292,7 +316,7 @@ function processarDadosBI(dados, dadosPagamentos) {
   } else {
     htmlPagamentos = "Nenhum registro de pagamento retornado para o período.";
   }
-
+  
   // --- 3. ATUALIZAÇÃO DOS CARDS NO HTML ---
   document.getElementById("cardValorBruto").innerHTML = `${htmlBrutoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(totalBrutoGeral)}</div>`;
   document.getElementById("cardDesconto").innerHTML = `${htmlDescontoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(totalDescontoGeral)}</div>`;
