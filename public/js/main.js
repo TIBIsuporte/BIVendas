@@ -1,7 +1,7 @@
 /**
  * Módulo Principal de Execução e Regras de Negócio do BI
  * Gerencia o carregamento de lojas, o envio de requisições paralelas para as APIs
- * e a renderização completa com suporte a abas.
+ * e a renderização completa do Dashboard gerencial e abas.
  */
 
 const SUPABASE_URL = 'https://cwmofpwuihrnifsvqhik.supabase.co';
@@ -9,7 +9,7 @@ const SUPABASE_KEY = 'sb_publishable_biWjIRo9x6maeZXcoKX6Lw_l-fjV0wP';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let lojasDisponiveis = [];
-let meuGraficoLojas = null; // <- Variável global posicionada corretamente aqui!
+let meuGraficoLojas = null; // Variável global para gerenciar a instância do Chart.js
 
 window.onload = async () => {
   await carregarLojasSupabase();
@@ -18,24 +18,24 @@ window.onload = async () => {
 // --- FUNÇÃO DE CONTROLE DE ABAS ---
 function mudarAba(aba) {
   const btnCards = document.getElementById("btnAbaCards");
-  const btnGraficos = document.getElementById("btnAbaGraficos");
+  const btnDashboard = document.getElementById("btnAbaDashboard");
   const conteudoCards = document.getElementById("conteudoAbaCards");
-  const conteudoGraficos = document.getElementById("conteudoAbaGraficos");
+  const conteudoDashboard = document.getElementById("conteudoAbaDashboard");
 
   if (aba === 'cards') {
     conteudoCards.style.display = "flex";
-    conteudoGraficos.style.display = "none";
+    conteudoDashboard.style.display = "none";
     
     btnCards.style.background = "#0078d7";
     btnCards.style.color = "#fff";
-    btnGraficos.style.background = "#e0e0e0";
-    btnGraficos.style.color = "#333";
+    btnDashboard.style.background = "#e0e0e0";
+    btnDashboard.style.color = "#333";
   } else {
     conteudoCards.style.display = "none";
-    conteudoGraficos.style.display = "flex";
+    conteudoDashboard.style.display = "flex";
     
-    btnGraficos.style.background = "#0078d7";
-    btnGraficos.style.color = "#fff";
+    btnDashboard.style.background = "#0078d7";
+    btnDashboard.style.color = "#fff";
     btnCards.style.background = "#e0e0e0";
     btnCards.style.color = "#333";
   }
@@ -398,67 +398,110 @@ function processarDadosBI(dados, dadosPagamentos) {
 
   document.getElementById("cardResumoPagamento").innerHTML = htmlPagamentos;
   
-  // Exibe os botões de abas e o container mantendo a aba de cards ativa por padrão
+  // Exibe os botões de abas e os containers
   document.getElementById("biTabsHeader").style.display = "flex";
   document.getElementById("biCardsContainer").style.display = "flex";
   mudarAba('cards');
 
-  // --- CHAMADA DA FUNÇÃO DO GRÁFICO ---
-  renderizarGraficoParticipacao(totaisPorLoja, totalLiquidoGeral);
+  // --- RENDERIZAÇÃO DO DASHBOARD (GRÁFICO + RANKING DE DESCONTOS) ---
+  renderizarDashboard(totaisPorLoja, totalLiquidoGeral);
 }
 
-// --- FUNÇÃO PARA GERAR O GRÁFICO DE PORCENTAGEM (CHART.JS) ---
-function renderizarGraficoParticipacao(totaisPorLoja, totalLiquidoGeral) {
+// --- FUNÇÃO PARA RENDERIZAR O DASHBOARD (Gráfico de Rosca + Ranking de Descontos Proporcionais) ---
+function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
+  // 1. Renderiza o Gráfico de Rosca
   const ctx = document.getElementById('graficoParticipacaoLojas');
-  if (!ctx) return;
+  if (ctx) {
+    const labels = [];
+    const dadosPorcentagem = [];
+    const coresFundo = [
+      '#0078d7', '#5cb85c', '#f0ad4e', '#d9534f', '#6f42c1', 
+      '#17a2b8', '#e83e8c', '#fd7e14', '#20c997', '#6610f2'
+    ];
 
-  const labels = [];
-  const dadosPorcentagem = [];
-  const coresFundo = [
-    '#0078d7', '#5cb85c', '#f0ad4e', '#d9534f', '#6f42c1', 
-    '#17a2b8', '#e83e8c', '#fd7e14', '#20c997', '#6610f2'
-  ];
+    Object.keys(totaisPorLoja).forEach(idLoja => {
+      const t = totaisPorLoja[idLoja];
+      labels.push(`Loja ${idLoja}`);
+      const porcentagem = totalLiquidoGeral > 0 ? ((t.liquido / totalLiquidoGeral) * 100) : 0;
+      dadosPorcentagem.push(porcentagem.toFixed(2));
+    });
 
-  Object.keys(totaisPorLoja).forEach(idLoja => {
-    const t = totaisPorLoja[idLoja];
-    labels.push(`Loja ${idLoja}`);
-    
-    // Calcula a porcentagem em relação ao líquido total geral
-    const porcentagem = totalLiquidoGeral > 0 ? ((t.liquido / totalLiquidoGeral) * 100) : 0;
-    dadosPorcentagem.push(porcentagem.toFixed(2));
-  });
+    if (meuGraficoLojas) {
+      meuGraficoLojas.destroy();
+    }
 
-  // Destroi o gráfico anterior para evitar sobreposição ao realizar nova consulta
-  if (meuGraficoLojas) {
-    meuGraficoLojas.destroy();
-  }
-
-  meuGraficoLojas = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: labels,
-      datasets: [{
-        label: '% do Valor Líquido',
-        data: dadosPorcentagem,
-        backgroundColor: coresFundo.slice(0, labels.length),
-        borderWidth: 1
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          position: 'right',
-        },
-        tooltip: {
-          callbacks: {
-            label: function(context) {
-              return ` ${context.label}: ${context.raw}% do total líquido`;
+    meuGraficoLojas = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: '% do Valor Líquido',
+          data: dadosPorcentagem,
+          backgroundColor: coresFundo.slice(0, labels.length),
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right' },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                return ` ${context.label}: ${context.raw}% do total líquido`;
+              }
             }
           }
         }
       }
-    }
-  });
+    });
+  }
+
+  // 2. Processa e Renderiza o Ranking de Descontos Proporcionais (1º, 2º, 3º...)
+  const containerRanking = document.getElementById('rankingDescontosContainer');
+  if (containerRanking) {
+    const listaRanking = Object.keys(totaisPorLoja).map(idLoja => {
+      const t = totaisPorLoja[idLoja];
+      // Taxa de desconto proporcional real (Desconto / Bruto)
+      const taxaDesconto = t.bruto > 0 ? (t.desconto / t.bruto) * 100 : 0;
+      return {
+        idLoja,
+        bruto: t.bruto,
+        desconto: t.desconto,
+        taxaDesconto
+      };
+    });
+
+    // Ordena do maior desconto proporcional para o menor (Quem concede mais desconto lidera o ranking)
+    listaRanking.sort((a, b) => b.taxaDesconto - a.taxaDesconto);
+
+    let htmlRanking = "";
+    listaRanking.forEach((item, index) => {
+      let posicaoBadge = `#${index + 1}`;
+      let corBadge = "#666";
+      
+      if (index === 0) { corBadge = "#d9534f"; posicaoBadge = "🥇 1º"; } // Mais agressivo em descontos
+      else if (index === 1) { corBadge = "#f0ad4e"; posicaoBadge = "🥈 2º"; }
+      else if (index === 2) { corBadge = "#5cb85c"; posicaoBadge = "🥉 3º"; }
+
+      htmlRanking += `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; margin-bottom: 6px; background: #fff; border: 1px solid #e0e0e0; border-radius: 6px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-weight: bold; color: ${corBadge}; font-size: 14px; min-width: 40px;">${posicaoBadge}</span>
+            <div>
+              <strong>Loja ${item.idLoja}</strong>
+              <div style="font-size: 11px; color: #666;">Desc: ${formatarMoedaBR(item.desconto)} / Bruto: ${formatarMoedaBR(item.bruto)}</div>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <span style="font-size: 14px; font-weight: bold; color: #d9534f;">${item.taxaDesconto.toFixed(2)}%</span>
+            <div style="font-size: 10px; color: #888;">Taxa Média</div>
+          </div>
+        </div>
+      `;
+    });
+
+    containerRanking.innerHTML = htmlRanking || "Nenhum dado para o ranking.";
+  }
 }
