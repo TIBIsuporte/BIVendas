@@ -1,6 +1,6 @@
 /**
  * Módulo Principal de Execução e Regras de Negócio do BI
- * Gerencia o carregamento de lojas, o envio de requisições paralelas para las APIs
+ * Gerencia o carregamento de lojas, o envio de requisições paralelas para as APIs
  * e a renderização completa da Grid e dos Cards de Indicadores.
  */
 
@@ -205,7 +205,7 @@ function processarDadosBI(dados, dadosPagamentos) {
     totalLiquidoGeral += parseNumeroBR(item.LIQUIDOPRODUTO);
   });
 
-  // --- 2. PROCESSAMENTO DA API DE PAGAMENTOS (APIVendaResumoTodasFormasPagamento) ---
+  // --- 2. PROCESSAMENTO E CONTADOR DA API DE PAGAMENTOS (APIVendaResumoTodasFormasPagamento) ---
   let htmlPagamentos = "";
   if (Array.isArray(dadosPagamentos) && dadosPagamentos.length > 0) {
     let pagamentosFiltrados = dadosPagamentos;
@@ -224,16 +224,22 @@ function processarDadosBI(dados, dadosPagamentos) {
     }
 
     if (pagamentosFiltrados.length > 0) {
+      // Mapeamento e estruturação seguindo o roteiro de contagem de parcelas e valores
       htmlPagamentos = pagamentosFiltrados.map(pgto => {
-        const meio = pgto.MEIO_PAGAMENTO || pgto.MEIOPAGAMENTO || "Não especificado";
-        const bandeira = pgto.BANDEIRA_CARTAO ? ` (${pgto.BANDEIRA_CARTAO})` : "";
-        const forma = pgto.FORMA_PAGAMENTO ? ` - ${pgto.FORMA_PAGAMENTO}` : "";
-        const parcelas = pgto.N_PARCELAS || "1";
-        const qtdUso = parseNumeroBR(pgto.QTDE_USO || 1);
-        const valorTotalPgto = parseNumeroBR(pgto.VENDAS_VALOR || 0);
+        const meioPagamento = pgto.MEIO_PAGAMENTO || pgto.MEIOPAGAMENTO || "Não especificado";
+        const nParcelas = pgto.N_PARCELAS || "1";
+        const quantidadeVendas = parseNumeroBR(pgto.QTDE_USO || 1);
+        const vendasValor = parseNumeroBR(pgto.VENDAS_VALOR || 0);
 
-        return `<div style="margin-bottom: 6px;"><strong>${meio}${bandeira}${forma}</strong><br>Parcelas: ${parcelas} | Qtd: ${qtdUso} | Total: ${formatarMoedaBR(valorTotalPgto)}</div>`;
-      }).join("<hr style='border:0; border-top:1px dashed #ccc; margin:6px 0;'>");
+        return `
+          <div style="margin-bottom: 8px;">
+            <strong>Meio Pagamento:</strong> ${meioPagamento}<br>
+            <strong>Parcelas:</strong> ${nParcelas}<br>
+            <strong>Total vendas:</strong> ${quantidadeVendas}<br>
+            <strong>Valor Total:</strong> ${formatarMoedaBR(vendasValor)}
+          </div>
+        `;
+      }).join("<hr style='border:0; border-top:1px dashed #ccc; margin:8px 0;'>");
     } else {
       htmlPagamentos = "Nenhum registro de pagamento para a(s) loja(s) selecionada(s).";
     }
