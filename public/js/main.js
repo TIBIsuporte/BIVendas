@@ -60,13 +60,8 @@ function abrirModalLojas() {
   const inputFiltro = document.getElementById("inputFiltroGerenteModal");
   if (inputFiltro) inputFiltro.value = "";
   renderizarListaLojasModal(lojasDisponiveis);
-  
   const modal = document.getElementById("modalLojas");
-  if (modal) {
-    modal.style.display = "flex";
-  } else {
-    console.error("Elemento modalLojas não encontrado no HTML!");
-  }
+  if (modal) modal.style.display = "flex";
 }
 
 function renderizarListaLojasModal(lista) {
@@ -408,40 +403,28 @@ function processarDadosBI(dados, dadosPagamentos) {
   document.getElementById("biCardsContainer").style.display = "flex";
   mudarAba('cards');
 
-  // --- RENDERIZAÇÃO DO DASHBOARD ---
+  // --- RENDERIZAÇÃO DO DASHBOARD (GRÁFICO + RANKING DE DESCONTOS) ---
   renderizarDashboard(totaisPorLoja, totalLiquidoGeral);
 }
 
-// --- FUNÇÃO PARA RENDERIZAR O DASHBOARD ---
+// --- FUNÇÃO PARA RENDERIZAR O DASHBOARD (Gráfico de Rosca + Ranking de Descontos Proporcionais) ---
 function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
-  
-  // 1. Processa os dados ordenados por Faturamento/Líquido (Do maior para o menor)
-  const listaLojasOrdenadas = Object.keys(totaisPorLoja).map(idLoja => {
-    const t = totaisPorLoja[idLoja];
-    const taxaDesconto = t.bruto > 0 ? (t.desconto / t.bruto) * 100 : 0;
-    const participacao = totalLiquidoGeral > 0 ? (t.liquido / totalLiquidoGeral) * 100 : 0;
-    return {
-      idLoja,
-      bruto: t.bruto,
-      desconto: t.desconto,
-      liquido: t.liquido,
-      taxaDesconto,
-      participacao
-    };
-  });
-
-  // Ordena do maior líquido para o menor (para o ranking de vendas)
-  listaLojasOrdenadas.sort((a, b) => b.liquido - a.liquido);
-
-  // 2. Renderiza o Gráfico de Rosca
+  // 1. Renderiza o Gráfico de Rosca
   const ctx = document.getElementById('graficoParticipacaoLojas');
   if (ctx) {
-    const labels = listaLojasOrdenadas.map(item => `Loja ${item.idLoja}`);
-    const dadosPorcentagem = listaLojasOrdenadas.map(item => item.participacao.toFixed(2));
+    const labels = [];
+    const dadosPorcentagem = [];
     const coresFundo = [
       '#0078d7', '#5cb85c', '#f0ad4e', '#d9534f', '#6f42c1', 
       '#17a2b8', '#e83e8c', '#fd7e14', '#20c997', '#6610f2'
     ];
+
+    Object.keys(totaisPorLoja).forEach(idLoja => {
+      const t = totaisPorLoja[idLoja];
+      labels.push(`Loja ${idLoja}`);
+      const porcentagem = totalLiquidoGeral > 0 ? ((t.liquido / totalLiquidoGeral) * 100) : 0;
+      dadosPorcentagem.push(porcentagem.toFixed(2));
+    });
 
     if (meuGraficoLojas) {
       meuGraficoLojas.destroy();
@@ -466,8 +449,7 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
           tooltip: {
             callbacks: {
               label: function(context) {
-                const item = listaLojasOrdenadas[context.dataIndex];
-                return ` ${context.label}: ${formatarMoedaBR(item.liquido)} (${context.raw}% do total)`;
+                return ` ${context.label}: ${context.raw}% do total líquido`;
               }
             }
           }
@@ -476,58 +458,34 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
     });
   }
 
-  // 3. Renderiza o Ranking de Vendas por Colocações (Esquerda)
-  const containerRankingVendas = document.getElementById('rankingVendasContainer');
-  if (containerRankingVendas) {
-    let htmlRankingVendas = "";
-    listaLojasOrdenadas.forEach((item, index) => {
-      let posicaoBadge = `#${index + 1}`;
-      let corBadge = "#666";
-      
-      if (index === 0) { corBadge = "#5cb85c"; posicaoBadge = "🥇 1º"; } 
-      else if (index === 1) { corBadge = "#0078d7"; posicaoBadge = "🥈 2º"; }
-      else if (index === 2) { corBadge = "#f0ad4e"; posicaoBadge = "🥉 3º"; }
-
-      htmlRankingVendas += `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; margin-bottom: 6px; background: #fff; border: 1px solid #e0e0e0; border-radius: 6px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-weight: bold; color: ${corBadge}; font-size: 14px; min-width: 40px;">${posicaoBadge}</span>
-            <div>
-              <strong>Loja ${item.idLoja}</strong>
-              <div style="font-size: 11px; color: #666;">Participação: ${item.participacao.toFixed(1)}%</div>
-            </div>
-          </div>
-          <div style="text-align: right;">
-            <span style="font-size: 14px; font-weight: bold; color: #333;">${formatarMoedaBR(item.liquido)}</span>
-            <div style="font-size: 10px; color: #888;">Valor Líquido</div>
-          </div>
-        </div>
-      `;
+  // 2. Processa e Renderiza o Ranking de Descontos Proporcionais (1º, 2º, 3º...)
+  const containerRanking = document.getElementById('rankingDescontosContainer');
+  if (containerRanking) {
+    const listaRanking = Object.keys(totaisPorLoja).map(idLoja => {
+      const t = totaisPorLoja[idLoja];
+      // Taxa de desconto proporcional real (Desconto / Bruto)
+      const taxaDesconto = t.bruto > 0 ? (t.desconto / t.bruto) * 100 : 0;
+      return {
+        idLoja,
+        bruto: t.bruto,
+        desconto: t.desconto,
+        taxaDesconto
+      };
     });
-    containerRankingVendas.innerHTML = htmlRankingVendas || "Nenhum dado para o ranking.";
-  }
 
-  // 4. Atualiza o Valor Total de Vendas em destaque no bloco do gráfico
-  const totalVendasEl = document.getElementById('totalVendasDashboardValor');
-  if (totalVendasEl) {
-    totalVendasEl.innerText = formatarMoedaBR(totalLiquidoGeral);
-  }
+    // Ordena do maior desconto proporcional para o menor (Quem concede mais desconto lidera o ranking)
+    listaRanking.sort((a, b) => b.taxaDesconto - a.taxaDesconto);
 
-  // 5. Processa e Renderiza o Ranking de Descontos Proporcionais (Direita)
-  const containerRankingDescontos = document.getElementById('rankingDescontosContainer');
-  if (containerRankingDescontos) {
-    const listaRankingDesconto = [...listaLojasOrdenadas].sort((a, b) => b.taxaDesconto - a.taxaDesconto);
-
-    let htmlRankingDesc = "";
-    listaRankingDesconto.forEach((item, index) => {
+    let htmlRanking = "";
+    listaRanking.forEach((item, index) => {
       let posicaoBadge = `#${index + 1}`;
       let corBadge = "#666";
       
-      if (index === 0) { corBadge = "#d9534f"; posicaoBadge = "🥇 1º"; } 
+      if (index === 0) { corBadge = "#d9534f"; posicaoBadge = "🥇 1º"; } // Mais agressivo em descontos
       else if (index === 1) { corBadge = "#f0ad4e"; posicaoBadge = "🥈 2º"; }
       else if (index === 2) { corBadge = "#5cb85c"; posicaoBadge = "🥉 3º"; }
 
-      htmlRankingDesc += `
+      htmlRanking += `
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; margin-bottom: 6px; background: #fff; border: 1px solid #e0e0e0; border-radius: 6px;">
           <div style="display: flex; align-items: center; gap: 10px;">
             <span style="font-weight: bold; color: ${corBadge}; font-size: 14px; min-width: 40px;">${posicaoBadge}</span>
@@ -544,6 +502,6 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
       `;
     });
 
-    containerRankingDescontos.innerHTML = htmlRankingDesc || "Nenhum dado para o ranking.";
+    containerRanking.innerHTML = htmlRanking || "Nenhum dado para o ranking.";
   }
 }
