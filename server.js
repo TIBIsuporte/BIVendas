@@ -81,12 +81,12 @@ app.post("/consultadevolucoes", async (req, res) => {
 
 // 3. Rota Dedicada para Resumo de Formas de Pagamento e Parcelas (APIVendaResumoTodasFormasPagamento)
 app.post("/consultapagamentos", async (req, res) => {
+  // Mapeia os dados recebidos do front-end para o contrato exato que a API externa exige
   const body = {
-    DATAINICIAL: req.body.DATAINICIAL || "",
-    DATAFINAL: req.body.DATAFINAL || "",
-    LOJAS: req.body.LOJAS || "",
-    TIPODATA: req.body.TIPODATA || "VENDA",
-    TIPOVENDA: req.body.TIPOVENDA || ""
+    DATAVENDAINICIO: req.body.DATAINICIAL || "",
+    DATAVENDAFIM: req.body.DATAFINAL || "",
+    AGRUPAFORMAPAGAMENTO: "N",
+    LOJA: req.body.LOJAS || ""
   };
 
   try {
@@ -101,7 +101,8 @@ app.post("/consultapagamentos", async (req, res) => {
     });
 
     if (!response.ok) {
-      throw new Error(`Erro na API externa (Pagamentos): Status ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`Erro na API externa (Pagamentos): Status ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
@@ -111,7 +112,6 @@ app.post("/consultapagamentos", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
