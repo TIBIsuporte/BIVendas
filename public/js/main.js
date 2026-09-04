@@ -138,13 +138,14 @@ async function consultar() {
   };
 
   try {
-    const [resGrid, resDevolucoes] = await Promise.all([
+    // Chamada simultânea da Grid de Produtos e da API de Resumo de Formas de Pagamento
+    const [resGrid, resPagamentos] = await Promise.all([
       fetch("/consulta", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(bodyReq)
       }),
-      fetch("/consultadevolucoes", {
+      fetch("/consultapagamentos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(bodyReq)
@@ -154,13 +155,13 @@ async function consultar() {
     if (!resGrid.ok) throw new Error("Erro na requisição da Grid: " + resGrid.status);
     
     const dadosBrutos = await resGrid.json();
-    let dadosDevolucoes = [];
+    let dadosPagamentos = [];
 
-    if (resDevolucoes.ok) {
-      dadosDevolucoes = await resDevolucoes.json();
+    if (resPagamentos.ok) {
+      dadosPagamentos = await resPagamentos.json();
     }
 
-    processarDadosBI(dadosBrutos, dadosDevolucoes);
+    processarDadosBI(dadosBrutos, dadosPagamentos);
     renderizarGridTodosCampos(dadosBrutos);
   } catch (error) {
     document.getElementById("resultado").innerHTML = "<p class='erro'>" + error.message + "</p>";
@@ -170,7 +171,7 @@ async function consultar() {
   }
 }
 
-function processarDadosBI(dados, dadosDevolucoes) {
+function processarDadosBI(dados, dadosPagamentos) {
   if (!dados || dados.length === 0) {
     document.getElementById("biCardsContainer").style.display = "none";
     return;
@@ -195,76 +196,35 @@ function processarDadosBI(dados, dadosDevolucoes) {
 
   let totalBrutoGeral = 0;
   let totalDescontoGeral = 0;
-  let totalLiquidoTabela = 0;
-  let totalDevolucaoGeral = 0; 
-  const osSet = new Set();
+  let totalLiquidoGeral = 0;
 
-  console.group("🔍 [DEBUG] Analisando itens da API Principal");
-
-  // --- 1. PROCESSAMENTO DA API PRINCIPAL (ProdutosPorOSGRID) ---
+  // --- 1. LOOP DE SOMA DOS PRODUTOS POR O.S. (API ProdutosPorOSGRID) ---
   dadosFiltrados.forEach((item) => {
-    const osId = String(item.OS || item.CODIGODAVENDA || "").trim();
-    if (osId) osSet.add(osId);
-
-    const brutoItem = parseNumeroBR(item.VALORBRUTOPRODUTO);
-    const descItem = parseNumeroBR(item.DESCPRODUTO);
-    const liquidoItem = parseNumeroBR(item.LIQUIDOPRODUTO);
-    const tipoVendaPrincipal = String(item.TIPOVENDA || "").trim().toUpperCase();
-
-    totalBrutoGeral += brutoItem;
-    totalDescontoGeral += descItem;
-    totalLiquidoTabela += liquidoItem;
-
-    if (tipoVendaPrincipal === "TROCA") {
-      let valorTroca = parseNumeroBR(item.DESCONTOVENDA || item.LIQUIDOPRODUTO || 0);
-      if (valorTroca > 0) valorTroca = -valorTroca;
-      totalDevolucaoGeral += valorTroca;
-    }
+    totalBrutoGeral += parseNumeroBR(item.VALORBRUTOPRODUTO);
+    totalDescontoGeral += parseNumeroBR(item.DESCPRODUTO);
+    totalLiquidoGeral += parseNumeroBR(item.LIQUIDOPRODUTO);
   });
 
-  console.groupEnd();
+  // --- 2. PROCESSAMENTO DA API DE PAGAMENTOS (APIVendaResumoTodasFormasPagamento) ---
+  let htmlPagamentos = "";
+  if (Array.isArray(dadosPagamentos) && dadosPagamentos.length > 0) {
+    htmlPagamentos = dadosPagamentos.map(pgto => {
+      const meio = pgto.MEIOPAGAMENTO || pgto.FORMAPAGAMENTO || pgto.MEIO || "Não especificado";
+      const parcelas = pgto.N_PARCELAS || pgto.PARCELAS || pgto.NPARCELAS || "1";
+      const qtdVendas = parseNumeroBR(pgto.CONTADOR || pgto.QTDVENDAS || pgto.QUANTIDADE || 1);
+      const valorTotalPgto = parseNumeroBR(pgto.VENDASVALOR || pgto.VALOR || pgto.VALORTOTAL || 0);
 
-  // --- 2. PROCESSAMENTO DA API DE DEVOLUÇÕES (consultadevolucoes) ---
-  console.group("🔄 [DEBUG] Analisando API de Devoluções");
-  if (Array.isArray(dadosDevolucoes) && dadosDevolucoes.length > 0) {
-    dadosDevolucoes.forEach(itemDev => {
-      const tipoVendaDev = String(itemDev.TIPOVENDA || itemDev.TIPO || "").trim().toUpperCase();
-      
-      if (!tipoVendaDev.includes("DEVOLUCAO")) {
-        return; 
-      }
-
-      const textoLojaDev = String(itemDev.LOJANOME ?? itemDev.CODIGOLOJA ?? itemDev.LOJA ?? "").trim();
-      const matchDev = textoLojaDev.match(/^0*(\d+)/);
-      const codDev = matchDev ? matchDev[1] : textoLojaDev;
-      const codDevSemZero = matchDev ? String(parseInt(matchDev[1], 10)) : codDev;
-
-      const atendeLoja = !lojasDigitadas || 
-        lojasDigitadas.split(",").map(id => id.trim()).includes(codDev) ||
-        lojasDigitadas.split(",").map(id => id.trim()).includes(codDevSemZero) ||
-        lojasDigitadas.split(",").map(id => id.trim().toLowerCase()).some(id => textoLojaDev.toLowerCase().includes(id));
-
-      if (!atendeLoja) {
-        return;
-      }
-
-      let valorDevolucaoItem = parseNumeroBR(itemDev.LIQUIDOPRODUTO || itemDev.VALORBRUTOPRODUTO || itemDev.PRECOTOTALPRODUTO || 0);
-      if (valorDevolucaoItem > 0) valorDevolucaoItem = -valorDevolucaoItem;
-      
-      totalDevolucaoGeral += valorDevolucaoItem;
-    });
+      return `<div><strong>Meio Pagamento:</strong> ${meio} | <strong>Parcelas:</strong> ${parcelas} | <strong>Total vendas:</strong> ${qtdVendas} | <strong>Valor Total:</strong> ${formatarMoedaBR(valorTotalPgto)}</div>`;
+    }).join("<hr style='border:0; border-top:1px dashed #ccc; margin:6px 0;'>");
+  } else {
+    htmlPagamentos = "Nenhum registro de pagamento retornado para o período.";
   }
-  console.groupEnd();
 
-  // --- 3. CÁLCULO FINAL ---
-  let totalLiquidoFinal = totalLiquidoTabela + totalDevolucaoGeral;
-  let qtdeVendasGeral = osSet.size;
-
+  // --- 3. ATUALIZAÇÃO DOS CARDS NO HTML ---
   document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);
   document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);
-  document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoFinal);
-  document.getElementById("cardDevolucao").textContent = formatarMoedaBR(totalDevolucaoGeral);
-  document.getElementById("cardQtdeVendas").textContent = qtdeVendasGeral.toLocaleString('pt-BR');
+  document.getElementById("cardValorLiquido").textContent = formatarMoedaBR(totalLiquidoGeral);
+  document.getElementById("cardResumoPagamento").innerHTML = htmlPagamentos;
 
   document.getElementById("biCardsContainer").style.display = "grid";
 }
@@ -325,7 +285,6 @@ function renderizarGridTodosCampos(dados) {
   const totais = {};
   COLUNAS_VALORES_TOTALIZAR.forEach(col => totais[col] = 0);
 
-  console.group("📋 [INSPEÇÃO DE COLUNAS E TOTALIZAÇÃO DA TABELA]");
   dadosFiltrados.forEach((item) => {
     let tr = document.createElement("tr");
     colunas.forEach(coluna => {
@@ -343,7 +302,6 @@ function renderizarGridTodosCampos(dados) {
     });
     tbody.appendChild(tr);
   });
-  console.groupEnd();
 
   let trFoot = document.createElement("tr");
   colunas.forEach((coluna, index) => {
