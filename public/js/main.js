@@ -205,7 +205,7 @@ function processarDadosBI(dados, dadosPagamentos) {
     totalLiquidoGeral += parseNumeroBR(item.LIQUIDOPRODUTO);
   });
 
-  // --- 2. PROCESSAMENTO E CONTADOR DA API DE PAGAMENTOS (APIVendaResumoTodasFormasPagamento) ---
+// --- 2. PROCESSAMENTO E AGRUPAMENTO DA API DE PAGAMENTOS ---
   let htmlPagamentos = "";
   if (Array.isArray(dadosPagamentos) && dadosPagamentos.length > 0) {
     let pagamentosFiltrados = dadosPagamentos;
@@ -224,22 +224,44 @@ function processarDadosBI(dados, dadosPagamentos) {
     }
 
     if (pagamentosFiltrados.length > 0) {
-      // Mapeamento e estruturação seguindo o roteiro de contagem de parcelas e valores
-      htmlPagamentos = pagamentosFiltrados.map(pgto => {
-        const meioPagamento = pgto.MEIO_PAGAMENTO || pgto.MEIOPAGAMENTO || "Não especificado";
-        const nParcelas = pgto.N_PARCELAS || "1";
-        const quantidadeVendas = parseNumeroBR(pgto.QTDE_USO || 1);
-        const vendasValor = parseNumeroBR(pgto.VENDAS_VALOR || 0);
+      // Objeto para agrupar por Meio de Pagamento + Número de Parcelas
+      const agrupado = {};
 
+      pagamentosFiltrados.forEach(pgto => {
+        const meio = (pgto.MEIO_PAGAMENTO || pgto.MEIOPAGAMENTO || "NÃO ESPECIFICADO").trim();
+        const parcelas = (pgto.N_PARCELAS || "1").trim();
+        
+        // Chave única para consolidar (ex: "CARTAO|3 - PARCELAS")
+        const chave = `${meio}|${parcelas}`;
+
+        const qtdUso = parseNumeroBR(pgto.QTDE_USO || 1);
+        const valorTotalPgto = parseNumeroBR(pgto.VENDAS_VALOR || 0);
+
+        if (!agrupado[chave]) {
+          agrupado[chave] = {
+            meioPagamento: meio,
+            nParcelas: parcelas,
+            quantidadeVendas: 0,
+            vendasValor: 0
+          };
+        }
+
+        agrupado[chave].quantidadeVendas += qtdUso;
+        agrupado[chave].vendasValor += valorTotalPgto;
+      });
+
+      // Transforma o objeto agrupado em HTML limpo e consolidado
+      htmlPagamentos = Object.values(agrupado).map(item => {
         return `
           <div style="margin-bottom: 8px;">
-            <strong>Meio Pagamento:</strong> ${meioPagamento}<br>
-            <strong>Parcelas:</strong> ${nParcelas}<br>
-            <strong>Total vendas:</strong> ${quantidadeVendas}<br>
-            <strong>Valor Total:</strong> ${formatarMoedaBR(vendasValor)}
+            <strong>Meio Pagamento:</strong> ${item.meioPagamento}<br>
+            <strong>Parcelas:</strong> ${item.nParcelas}<br>
+            <strong>Total vendas:</strong> ${item.quantidadeVendas}<br>
+            <strong>Valor Total:</strong> ${formatarMoedaBR(item.vendasValor)}
           </div>
         `;
       }).join("<hr style='border:0; border-top:1px dashed #ccc; margin:8px 0;'>");
+
     } else {
       htmlPagamentos = "Nenhum registro de pagamento para a(s) loja(s) selecionada(s).";
     }
@@ -247,6 +269,7 @@ function processarDadosBI(dados, dadosPagamentos) {
     htmlPagamentos = "Nenhum registro de pagamento retornado para o período.";
   }
 
+  
   // --- 3. ATUALIZAÇÃO DOS CARDS NO HTML ---
   document.getElementById("cardValorBruto").textContent = formatarMoedaBR(totalBrutoGeral);
   document.getElementById("cardDesconto").textContent = formatarMoedaBR(totalDescontoGeral);
