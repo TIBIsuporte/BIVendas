@@ -198,9 +198,8 @@ function processarDadosBI(dados, dadosPagamentos) {
   let totalLiquidoGeral = 0;
 
   const totaisPorLoja = {};
-  const osUnicasPorLoja = {}; // Controla as OS distintas para contar vendas reais por loja
 
-  // --- 1. LOOP DE SOMA, DETALHAMENTO POR LOJA E OS ÚNICAS ---
+  // --- 1. LOOP DE SOMA E DETALHAMENTO POR LOJA ---
   dadosFiltrados.forEach((item) => {
     const bruto = parseNumeroBR(item.VALORBRUTOPRODUTO);
     const desconto = parseNumeroBR(item.DESCPRODUTO);
@@ -220,15 +219,6 @@ function processarDadosBI(dados, dadosPagamentos) {
     totaisPorLoja[idLoja].bruto += bruto;
     totaisPorLoja[idLoja].desconto += desconto;
     totaisPorLoja[idLoja].liquido += liquido;
-
-    // Coleta a OS única por loja para contabilizar a quantidade real de vendas
-    const numeroOS = String(item.OS || "").trim();
-    if (numeroOS) {
-      if (!osUnicasPorLoja[idLoja]) {
-        osUnicasPorLoja[idLoja] = new Set();
-      }
-      osUnicasPorLoja[idLoja].add(numeroOS);
-    }
   });
 
   let htmlBrutoPorLoja = "";
@@ -291,7 +281,7 @@ function processarDadosBI(dados, dadosPagamentos) {
         agrupadoPagamentos[chave].lojas[idLoja].vendasValor += valorTotalPgto;
       });
 
-      // Gera o HTML formatado com base nas OS únicas por loja
+      // Gera o HTML com a totalização no topo do bloco e o detalhamento por loja embaixo
       htmlPagamentos = Object.values(agrupadoPagamentos).map(item => {
         
         let totalGeralValorGrupo = 0;
@@ -300,17 +290,14 @@ function processarDadosBI(dados, dadosPagamentos) {
         let linhasLojasHTML = Object.keys(item.lojas).map(idLoja => {
           const dadosLoja = item.lojas[idLoja];
           
-          // Se houver controle de OS únicas para essa loja, usa o tamanho do Set. Caso contrário, usa o padrão da API.
-          const qtdVendasReal = osUnicasPorLoja[idLoja] ? osUnicasPorLoja[idLoja].size : dadosLoja.quantidadeVendas;
-
           totalGeralValorGrupo += dadosLoja.vendasValor;
-          totalGeralQtdGrupo += qtdVendasReal;
+          totalGeralQtdGrupo += dadosLoja.quantidadeVendas;
 
           return `
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px dashed #eee; font-size: 13px;">
               <span style="font-weight: bold; min-width: 50px;">${idLoja}</span>
               <span style="color: #333;">${formatarMoedaBR(dadosLoja.vendasValor)}</span>
-              <span style="color: #666; font-size: 12px;">Qtd Vendas: <strong>${qtdVendasReal}</strong></span>
+              <span style="color: #666; font-size: 12px;">Qtde: <strong>${dadosLoja.quantidadeVendas}</strong></span>
             </div>
           `;
         }).join("");
@@ -320,7 +307,7 @@ function processarDadosBI(dados, dadosPagamentos) {
             <div style="font-size: 13px; font-weight: bold; color: #333; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 4px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
               <span>Meio Pagamento: <strong style="color: #0078d7;">${item.meioPagamento}</strong></span>
               <span>Parcelas: <strong style="color: #0078d7;">${item.nParcelas}</strong></span>
-              <span>Total vendas: <strong>${totalGervalQtdGrupo = Object.keys(item.lojas).reduce((acc, idLoja) => acc + (osUnicasPorLoja[idLoja] ? osUnicasPorLoja[idLoja].size : 0), 0)}</strong></span>
+              <span>Total vendas: <strong>${totalGeralQtdGrupo}</strong></span>
               <span>Valor Total: <strong style="color: #0078d7;">${formatarMoedaBR(totalGeralValorGrupo)}</strong></span>
             </div>
             <div style="display: flex; flex-direction: column; gap: 2px;">
