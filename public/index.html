@@ -45,26 +45,27 @@
 
   <div id="resultado"></div>
 
+  <!-- CONTAINER DE CARDS BI ATUALIZADO -->
   <div class="bi-cards-container" id="biCardsContainer" style="display: none;">
     <div class="bi-card" style="border-left-color: #0275d8;">
-      <div class="bi-card-title">Valor Bruto</div>
+      <div class="bi-card-title">Valor Bruto Total</div>
       <div class="bi-card-value" id="cardValorBruto">R$ 0,00</div>
     </div>
     <div class="bi-card" style="border-left-color: #d9534f;">
-      <div class="bi-card-title">Desconto</div>
+      <div class="bi-card-title">Valor Desconto Total</div>
       <div class="bi-card-value" id="cardDesconto">R$ 0,00</div>
     </div>
-    <div class="bi-card" style="border-left-color: #f0ad4e;">
-      <div class="bi-card-title">Devolução</div>
-      <div class="bi-card-value" id="cardDevolucao">R$ 0,00</div>
-    </div> 
     <div class="bi-card" style="border-left-color: #5cb85c;">
-      <div class="bi-card-title">Valor Líquido</div>
+      <div class="bi-card-title">Valor Líquido Total</div>
       <div class="bi-card-value" id="cardValorLiquido">R$ 0,00</div>
-    </div>
-    <div class="bi-card" style="border-left-color: #6f42c1;">
-      <div class="bi-card-title">Qtde Vendas (O.S.)</div>
-      <div class="bi-card-value" id="cardQtdeVendas">0</div>
+    </div> 
+    
+    <!-- NOVO CARD: Resumo de Formas de Pagamento e Parcelas -->
+    <div class="bi-card" style="border-left-color: #17a2b8; grid-column: span 3;">
+      <div class="bi-card-title">Resumo de Pagamento & Parcelas</div>
+      <div class="bi-card-value" id="cardResumoPagamento" style="font-size: 14px; font-weight: normal; line-height: 1.5; text-align: left;">
+        Aguardando consulta...
+      </div>
     </div>
   </div>
 
