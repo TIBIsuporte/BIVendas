@@ -83,6 +83,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
-```[cite: 9]
-
-Se precisar de mais algum arquivo específico (como o `index.html` ou os scripts), é só me avisar!
