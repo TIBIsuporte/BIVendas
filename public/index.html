@@ -45,8 +45,8 @@
 
   <div id="resultado"></div>
 
-  <!-- CONTAINER DE CARDS BI ATUALIZADO -->
-  <div class="bi-cards-container" id="biCardsContainer" style="display: none;">
+  <!-- CONTAINER DE CARDS BI ATUALIZADO COM O CARD DE QTDE DE VENDAS -->
+  <div class="bi-cards-container" id="biCardsContainer" style="display: none; grid-template-columns: repeat(4, 1fr);">
     <div class="bi-card" style="border-left-color: #0275d8;">
       <div class="bi-card-title">Valor Bruto Total</div>
       <div class="bi-card-value" id="cardValorBruto">R$ 0,00</div>
@@ -60,8 +60,14 @@
       <div class="bi-card-value" id="cardValorLiquido">R$ 0,00</div>
     </div> 
     
-    <!-- NOVO CARD: Resumo de Formas de Pagamento e Parcelas -->
-    <div class="bi-card" style="border-left-color: #17a2b8; grid-column: span 3;">
+    <!-- CARD DE QTDE DE VENDAS ADICIONADO NO TOPO -->
+    <div class="bi-card" style="border-left-color: #f0ad4e;">
+      <div class="bi-card-title">Qtde Vendas</div>
+      <div class="bi-card-value" id="cardQtdeVendas">0</div>
+    </div>
+
+    <!-- Resumo de Formas de Pagamento e Parcelas (embaixo ocupando a largura toda) -->
+    <div class="bi-card" style="border-left-color: #17a2b8; grid-column: 1 / -1;">
       <div class="bi-card-title">Resumo de Pagamento & Parcelas</div>
       <div class="bi-card-value" id="cardResumoPagamento" style="font-size: 14px; font-weight: normal; line-height: 1.5; text-align: left;">
         Aguardando consulta...
@@ -97,7 +103,6 @@
     </div>
   </div>
 
-  <!-- Scripts estruturados corretamente -->
   <script src="/js/lojas-modal.js"></script>
   <script src="/js/main.js"></script>
 </body>
