@@ -1,21 +1,12 @@
 /**
  * Módulo Principal de Execução e Regras de Negócio do BI
  * Gerencia o carregamento de lojas, o envio de requisições paralelas para as APIs
- * e a renderização completa da Grid e dos Cards de Indicadores.
+ * e a renderização completa dos Cards de Indicadores (sem a grid inferior).
  */
 
 const SUPABASE_URL = 'https://cwmofpwuihrnifsvqhik.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_biWjIRo9x6maeZXcoKX6Lw_l-fjV0wP';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-const COLUNAS_VALORES_TOTALIZAR = [
-  'QUANTIDADE',
-  'QUANTIDADETOTAL',
-  'VALORBRUTOPRODUTO',
-  'DESCPRODUTO',
-  'LIQUIDOPRODUTO',
-  'CUSTO'
-];
 
 let lojasDisponiveis = [];
 
@@ -122,7 +113,10 @@ function formatarMoedaBR(valor) {
 
 async function consultar() {
   document.getElementById("loadingOverlay").style.display = "flex";
-  document.getElementById("resultado").innerHTML = "";
+  
+  // Limpa qualquer conteúdo anterior da grid inferior (excluindo visualmente a tabela da tela)
+  const containerResultado = document.getElementById("resultado");
+  if (containerResultado) containerResultado.innerHTML = "";
 
   const dataInicial = formatarDataISOparaBR(document.getElementById("dataInicial").value);
   const dataFinal = formatarDataISOparaBR(document.getElementById("dataFinal").value);
@@ -138,7 +132,7 @@ async function consultar() {
   };
 
   try {
-    // Chamada simultânea da Grid de Produtos e da API de Resumo de Formas de Pagamento
+    // Chamada simultânea da API de Produtos e da API de Resumo de Formas de Pagamento
     const [resGrid, resPagamentos] = await Promise.all([
       fetch("/consulta", {
         method: "POST",
@@ -152,7 +146,7 @@ async function consultar() {
       })
     ]);
 
-    if (!resGrid.ok) throw new Error("Erro na requisição da Grid: " + resGrid.status);
+    if (!resGrid.ok) throw new Error("Erro na requisição dos dados de produtos: " + resGrid.status);
     
     const dadosBrutos = await resGrid.json();
     let dadosPagamentos = [];
@@ -161,11 +155,16 @@ async function consultar() {
       dadosPagamentos = await resPagamentos.json();
     }
 
+    // Processa e exibe apenas os cards gerenciais (topo + resumo embaixo)
     processarDadosBI(dadosBrutos, dadosPagamentos);
-    renderizarGridTodosCampos(dadosBrutos);
+    
+    // A tabela detalhada inferior foi completamente excluída desta tela conforme solicitado.
+
   } catch (error) {
-    document.getElementById("resultado").innerHTML = "<p class='erro'>" + error.message + "</p>";
-    limparTabela();
+    if (containerResultado) {
+      containerResultado.innerHTML = "<p class='erro'>" + error.message + "</p>";
+    }
+    document.getElementById("biCardsContainer").style.display = "none";
   } finally {
     document.getElementById("loadingOverlay").style.display = "none";
   }
@@ -198,10 +197,9 @@ function processarDadosBI(dados, dadosPagamentos) {
   let totalDescontoGeral = 0;
   let totalLiquidoGeral = 0;
 
-  // Objeto para armazenar os totais separados por ID de Loja (Desejado na Imagem 2)
   const totaisPorLoja = {};
 
-  // --- 1. LOOP DE SOMA E DETALHAMENTO POR LOJA (API ProdutosPorOSGRID) ---
+  // --- 1. LOOP DE SOMA E DETALHAMENTO POR LOJA ---
   dadosFiltrados.forEach((item) => {
     const bruto = parseNumeroBR(item.VALORBRUTOPRODUTO);
     const desconto = parseNumeroBR(item.DESCPRODUTO);
@@ -211,7 +209,6 @@ function processarDadosBI(dados, dadosPagamentos) {
     totalDescontoGeral += desconto;
     totalLiquidoGeral += liquido;
 
-    // Extrai o código da loja para o detalhamento individual
     const textoLoja = String(item.LOJANOME ?? item.CODIGOLOJA ?? item.LOJA ?? "").trim();
     const matchLoja = textoLoja.match(/^0*(\d+)/);
     const idLoja = matchLoja ? matchLoja[1] : textoLoja;
@@ -224,7 +221,6 @@ function processarDadosBI(dados, dadosPagamentos) {
     totaisPorLoja[idLoja].liquido += liquido;
   });
 
-  // Gera o HTML interno para exibir os valores detalhados por loja no topo de cada card
   let htmlBrutoPorLoja = "";
   let htmlDescontoPorLoja = "";
   let htmlLiquidoPorLoja = "";
@@ -255,14 +251,12 @@ function processarDadosBI(dados, dadosPagamentos) {
     }
 
     if (pagamentosFiltrados.length > 0) {
-      // Objeto para agrupar por Meio de Pagamento + Número de Parcelas
       const agrupado = {};
 
       pagamentosFiltrados.forEach(pgto => {
         const meio = (pgto.MEIO_PAGAMENTO || pgto.MEIOPAGAMENTO || "NÃO ESPECIFICADO").trim();
         const parcelas = (pgto.N_PARCELAS || "1").trim();
         
-        // Chave única para consolidar (ex: "CARTAO|3 - PARCELAS")
         const chave = `${meio}|${parcelas}`;
 
         const qtdUso = parseNumeroBR(pgto.QTDE_USO || 1);
@@ -281,7 +275,6 @@ function processarDadosBI(dados, dadosPagamentos) {
         agrupado[chave].vendasValor += valorTotalPgto;
       });
 
-      // Transforma o objeto agrupado em HTML limpo e consolidado
       htmlPagamentos = Object.values(agrupado).map(item => {
         return `
           <div style="margin-bottom: 8px;">
@@ -300,115 +293,11 @@ function processarDadosBI(dados, dadosPagamentos) {
     htmlPagamentos = "Nenhum registro de pagamento retornado para o período.";
   }
 
-  // --- 3. ATUALIZAÇÃO DOS CARDS NO HTML COM DETALHAMENTO E TOTAIS ---
+  // --- 3. ATUALIZAÇÃO DOS CARDS NO HTML ---
   document.getElementById("cardValorBruto").innerHTML = `${htmlBrutoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(totalBrutoGeral)}</div>`;
   document.getElementById("cardDesconto").innerHTML = `${htmlDescontoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(totalDescontoGeral)}</div>`;
-  document.getElementById("cardValorLiquido").innerHTML = `${htmlLiquidoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(totalLiquidoGeral)}</div>`;
+  document.getElementById("cardValorLiquido").innerHTML = `${htmlLiquidoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(formatarMoedaBR ? totalLiquidoGeral : totalLiquidoGeral)}</div>`;
   document.getElementById("cardResumoPagamento").innerHTML = htmlPagamentos;
 
   document.getElementById("biCardsContainer").style.display = "grid";
-}
-
-function renderizarGridTodosCampos(dados) {
-  const thead = document.getElementById("cabecalhoTabela");
-  const tbody = document.getElementById("corpoTabela");
-  const tfoot = document.getElementById("rodapeTabela");
-  const labelTotal = document.getElementById("totalRegistros");
-
-  thead.innerHTML = "";
-  tbody.innerHTML = "";
-  tfoot.innerHTML = "";
-
-  if (!dados || dados.length === 0) {
-    labelTotal.textContent = "0 registros encontrados";
-    thead.innerHTML = "<tr><th>Mensagem</th></tr>";
-    tbody.innerHTML = "<tr><td style='text-align: center;'>Nenhum registro encontrado.</td></tr>";
-    return;
-  }
-
-  const lojasDigitadas = document.getElementById("lojas").value.trim();
-  let dadosFiltrados = dados;
-
-  if (lojasDigitadas) {
-    const idsFiltro = lojasDigitadas.split(",").map(id => id.trim());
-    dadosFiltrados = dados.filter(item => {
-      const textoLojaCompleto = String(item.LOJANOME ?? item.CODIGOLOJA ?? item.LOJA ?? "").trim();
-      const matchCodigo = textoLojaCompleto.match(/^0*(\d+)/);
-      const codigoExtraido = matchCodigo ? matchCodigo[1] : textoLojaCompleto;
-      const codigoSemZeroEsquerda = matchCodigo ? String(parseInt(matchCodigo[1], 10)) : codigoExtraido;
-
-      return idsFiltro.includes(codigoExtraido) || 
-             idsFiltro.includes(codigoSemZeroEsquerda) || 
-             idsFiltro.some(id => textoLojaCompleto.toLowerCase().includes(id.toLowerCase()));
-    });
-  }
-
-  if (dadosFiltrados.length === 0) {
-    labelTotal.textContent = "0 registros encontrados";
-    thead.innerHTML = "<tr><th>Mensagem</th></tr>";
-    tbody.innerHTML = "<tr><td style='text-align: center;'>Nenhum registro encontrado para a(s) loja(s) informada(s).</td></tr>";
-    return;
-  }
-
-  labelTotal.textContent = `${dadosFiltrados.length.toLocaleString('pt-BR')} registros encontrados`;
-
-  const colunas = Object.keys(dadosFiltrados[0]);
-
-  let trHead = document.createElement("tr");
-  colunas.forEach(coluna => {
-    let th = document.createElement("th");
-    th.textContent = coluna;
-    trHead.appendChild(th);
-  });
-  thead.appendChild(trHead);
-
-  const totais = {};
-  COLUNAS_VALORES_TOTALIZAR.forEach(col => totais[col] = 0);
-
-  dadosFiltrados.forEach((item) => {
-    let tr = document.createElement("tr");
-    colunas.forEach(coluna => {
-      let td = document.createElement("td");
-      let valor = item[coluna];
-
-      td.textContent = (valor === null || valor === undefined) ? "-" : valor;
-      tr.appendChild(td);
-
-      const colunaUpper = coluna.toUpperCase();
-      if (COLUNAS_VALORES_TOTALIZAR.includes(colunaUpper)) {
-        const numParsed = parseNumeroBR(valor);
-        totais[colunaUpper] += numParsed;
-      }
-    });
-    tbody.appendChild(tr);
-  });
-
-  let trFoot = document.createElement("tr");
-  colunas.forEach((coluna, index) => {
-    let td = document.createElement("td");
-    const colunaUpper = coluna.toUpperCase();
-
-    if (index === 0) {
-      td.textContent = "TOTAL";
-    } else if (COLUNAS_VALORES_TOTALIZAR.includes(colunaUpper)) {
-      if (colunaUpper.includes('QUANTIDADE')) {
-        td.textContent = totais[colunaUpper].toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-      } else {
-        td.textContent = formatarMoedaBR(totais[colunaUpper]);
-      }
-      td.classList.add("text-right");
-    } else {
-      td.textContent = "-";
-    }
-    trFoot.appendChild(td);
-  });
-  tfoot.appendChild(trFoot);
-}
-
-function limparTabela() {
-  document.getElementById("totalRegistros").textContent = "0 registros encontrados";
-  document.getElementById("cabecalhoTabela").innerHTML = "<tr><th>Status</th></tr>";
-  document.getElementById("corpoTabela").innerHTML = "<tr><td style='text-align: center; color: red;'>Erro ao carregar dados.</td></tr>";
-  document.getElementById("rodapeTabela").innerHTML = "";
-  document.getElementById("biCardsContainer").style.display = "none";
 }
