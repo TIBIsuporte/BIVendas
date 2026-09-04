@@ -114,7 +114,6 @@ function formatarMoedaBR(valor) {
 async function consultar() {
   document.getElementById("loadingOverlay").style.display = "flex";
   
-  // Limpa qualquer conteúdo anterior da grid inferior (excluindo visualmente a tabela da tela)
   const containerResultado = document.getElementById("resultado");
   if (containerResultado) containerResultado.innerHTML = "";
 
@@ -132,7 +131,6 @@ async function consultar() {
   };
 
   try {
-    // Chamada simultânea da API de Produtos e da API de Resumo de Formas de Pagamento
     const [resGrid, resPagamentos] = await Promise.all([
       fetch("/consulta", {
         method: "POST",
@@ -155,10 +153,7 @@ async function consultar() {
       dadosPagamentos = await resPagamentos.json();
     }
 
-    // Processa e exibe apenas os cards gerenciais (topo + resumo embaixo)
     processarDadosBI(dadosBrutos, dadosPagamentos);
-    
-    // A tabela detalhada inferior foi completamente excluída desta tela conforme solicitado.
 
   } catch (error) {
     if (containerResultado) {
@@ -170,6 +165,7 @@ async function consultar() {
   }
 }
 
+// --- FUNÇÃO DE PROCESSAMENTO GLOBAL (FORA DO CONSULTAR) ---
 function processarDadosBI(dados, dadosPagamentos) {
   if (!dados || dados.length === 0) {
     document.getElementById("biCardsContainer").style.display = "none";
@@ -198,8 +194,8 @@ function processarDadosBI(dados, dadosPagamentos) {
   let totalLiquidoGeral = 0;
 
   const totaisPorLoja = {};
+  const osUnicasPorLoja = {}; 
 
-  // --- 1. LOOP DE SOMA E DETALHAMENTO POR LOJA ---
   dadosFiltrados.forEach((item) => {
     const bruto = parseNumeroBR(item.VALORBRUTOPRODUTO);
     const desconto = parseNumeroBR(item.DESCPRODUTO);
@@ -219,20 +215,33 @@ function processarDadosBI(dados, dadosPagamentos) {
     totaisPorLoja[idLoja].bruto += bruto;
     totaisPorLoja[idLoja].desconto += desconto;
     totaisPorLoja[idLoja].liquido += liquido;
+
+    const numeroOS = String(item.OS || "").trim();
+    if (numeroOS) {
+      if (!osUnicasPorLoja[idLoja]) {
+        osUnicasPorLoja[idLoja] = new Set();
+      }
+      osUnicasPorLoja[idLoja].add(numeroOS);
+    }
   });
 
   let htmlBrutoPorLoja = "";
   let htmlDescontoPorLoja = "";
   let htmlLiquidoPorLoja = "";
+  let htmlQtdeVendasPorLoja = "";
+  let totalGeralVendasOS = 0;
 
   Object.keys(totaisPorLoja).forEach(id => {
     const t = totaisPorLoja[id];
+    const qtdVendasLoja = osUnicasPorLoja[id] ? osUnicasPorLoja[id].size : 0;
+    totalGeralVendasOS += qtdVendasLoja;
+
     htmlBrutoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.bruto)}</span></div>`;
     htmlDescontoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.desconto)}</span></div>`;
     htmlLiquidoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.liquido)}</span></div>`;
+    htmlQtdeVendasPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${qtdVendasLoja}</span></div>`;
   });
 
-  // --- 2. PROCESSAMENTO E AGRUPAMENTO DA API DE PAGAMENTOS POR LOJA ---
   let htmlPagamentos = "";
   if (Array.isArray(dadosPagamentos) && dadosPagamentos.length > 0) {
     let pagamentosFiltrados = dadosPagamentos;
@@ -281,9 +290,7 @@ function processarDadosBI(dados, dadosPagamentos) {
         agrupadoPagamentos[chave].lojas[idLoja].vendasValor += valorTotalPgto;
       });
 
-      // Gera o HTML com a totalização no topo do bloco e o detalhamento por loja embaixo
       htmlPagamentos = Object.values(agrupadoPagamentos).map(item => {
-        
         let totalGeralValorGrupo = 0;
         let totalGeralQtdGrupo = 0;
 
@@ -297,7 +304,7 @@ function processarDadosBI(dados, dadosPagamentos) {
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px dashed #eee; font-size: 13px;">
               <span style="font-weight: bold; min-width: 50px;">${idLoja}</span>
               <span style="color: #333;">${formatarMoedaBR(dadosLoja.vendasValor)}</span>
-              <span style="color: #666; font-size: 12px;">Qtde: <strong>${dadosLoja.quantidadeVendas}</strong></span>
+              <span style="color: #666; font-size: 12px;">Qtd Vendas: <strong>${dadosLoja.quantidadeVendas}</strong></span>
             </div>
           `;
         }).join("");
@@ -324,11 +331,15 @@ function processarDadosBI(dados, dadosPagamentos) {
     htmlPagamentos = "Nenhum registro de pagamento retornado para o período.";
   }
   
-  // --- 3. ATUALIZAÇÃO DOS CARDS NO HTML ---
   document.getElementById("cardValorBruto").innerHTML = `${htmlBrutoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(totalBrutoGeral)}</div>`;
   document.getElementById("cardDesconto").innerHTML = `${htmlDescontoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(totalDescontoGeral)}</div>`;
   document.getElementById("cardValorLiquido").innerHTML = `${htmlLiquidoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(totalLiquidoGeral)}</div>`;
-  document.getElementById("cardResumoPagamento").innerHTML = htmlPagamentos;
+  
+  const cardQtdeVendasEl = document.getElementById("cardQtdeVendas");
+  if (cardQtdeVendasEl) {
+    cardQtdeVendasEl.innerHTML = `${htmlQtdeVendasPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">Total vendas: ${totalGeralVendasOS}</div>`;
+  }
 
+  document.getElementById("cardResumoPagamento").innerHTML = htmlPagamentos;
   document.getElementById("biCardsContainer").style.display = "grid";
 }
