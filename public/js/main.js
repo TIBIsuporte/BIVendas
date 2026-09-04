@@ -114,7 +114,6 @@ function formatarMoedaBR(valor) {
 async function consultar() {
   document.getElementById("loadingOverlay").style.display = "flex";
   
-  // Limpa qualquer conteúdo anterior da grid inferior (excluindo visualmente a tabela da tela)
   const containerResultado = document.getElementById("resultado");
   if (containerResultado) containerResultado.innerHTML = "";
 
@@ -132,7 +131,6 @@ async function consultar() {
   };
 
   try {
-    // Chamada simultânea da API de Produtos e da API de Resumo de Formas de Pagamento
     const [resGrid, resPagamentos] = await Promise.all([
       fetch("/consulta", {
         method: "POST",
@@ -155,7 +153,19 @@ async function consultar() {
       dadosPagamentos = await resPagamentos.json();
     }
 
-    // Processa e exibe apenas os cards gerenciais (topo + resumo embaixo)
+    processarDadosBI(dadosBrutos, dadosPagamentos);
+
+  } catch (error) {
+    if (containerResultado) {
+      containerResultado.innerHTML = "<p class='erro'>" + error.message + "</p>";
+    }
+    document.getElementById("biCardsContainer").style.display = "none";
+  } finally {
+    document.getElementById("loadingOverlay").style.display = "none";
+  }
+}
+
+// --- FUNÇÃO DE PROCESSAMENTO GLOBAL (FORA DO CONSULTAR) ---
 function processarDadosBI(dados, dadosPagamentos) {
   if (!dados || dados.length === 0) {
     document.getElementById("biCardsContainer").style.display = "none";
@@ -184,9 +194,8 @@ function processarDadosBI(dados, dadosPagamentos) {
   let totalLiquidoGeral = 0;
 
   const totaisPorLoja = {};
-  const osUnicasPorLoja = {}; // Controla as OS distintas para contar as vendas reais por loja (evitando duplicação por itens)
+  const osUnicasPorLoja = {}; 
 
-  // --- 1. LOOP DE SOMA E CAPTURA DE OS ÚNICAS POR LOJA ---
   dadosFiltrados.forEach((item) => {
     const bruto = parseNumeroBR(item.VALORBRUTOPRODUTO);
     const desconto = parseNumeroBR(item.DESCPRODUTO);
@@ -207,7 +216,6 @@ function processarDadosBI(dados, dadosPagamentos) {
     totaisPorLoja[idLoja].desconto += desconto;
     totaisPorLoja[idLoja].liquido += liquido;
 
-    // Coleta a OS única por loja para o novo card de Quantidade de Vendas
     const numeroOS = String(item.OS || "").trim();
     if (numeroOS) {
       if (!osUnicasPorLoja[idLoja]) {
@@ -231,12 +239,9 @@ function processarDadosBI(dados, dadosPagamentos) {
     htmlBrutoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.bruto)}</span></div>`;
     htmlDescontoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.desconto)}</span></div>`;
     htmlLiquidoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.liquido)}</span></div>`;
-    
-    // Monta o HTML do card de quantidade de vendas por loja (ex: 519 2)
     htmlQtdeVendasPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${qtdVendasLoja}</span></div>`;
   });
 
-  // --- 2. PROCESSAMENTO E AGRUPAMENTO DA API DE PAGAMENTOS (MANTIDO ORIGINAL) ---
   let htmlPagamentos = "";
   if (Array.isArray(dadosPagamentos) && dadosPagamentos.length > 0) {
     let pagamentosFiltrados = dadosPagamentos;
@@ -326,12 +331,10 @@ function processarDadosBI(dados, dadosPagamentos) {
     htmlPagamentos = "Nenhum registro de pagamento retornado para o período.";
   }
   
-  // --- 3. ATUALIZAÇÃO DOS CARDS NO HTML ---
   document.getElementById("cardValorBruto").innerHTML = `${htmlBrutoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(totalBrutoGeral)}</div>`;
   document.getElementById("cardDesconto").innerHTML = `${htmlDescontoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(totalDescontoGeral)}</div>`;
   document.getElementById("cardValorLiquido").innerHTML = `${htmlLiquidoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">${formatarMoedaBR(totalLiquidoGeral)}</div>`;
   
-  // Atualiza o card separado de Qtde Vendas (com o detalhamento por loja e o totalizador no rodapé)
   const cardQtdeVendasEl = document.getElementById("cardQtdeVendas");
   if (cardQtdeVendasEl) {
     cardQtdeVendasEl.innerHTML = `${htmlQtdeVendasPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 16px; font-weight: bold;">Total vendas: ${totalGeralVendasOS}</div>`;
