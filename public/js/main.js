@@ -165,7 +165,6 @@ async function consultar() {
   }
 }
 
-// --- FUNÇÃO DE PROCESSAMENTO GLOBAL (FORA DO CONSULTAR) ---
 function processarDadosBI(dados, dadosPagamentos) {
   if (!dados || dados.length === 0) {
     document.getElementById("biCardsContainer").style.display = "none";
@@ -194,7 +193,9 @@ function processarDadosBI(dados, dadosPagamentos) {
   let totalLiquidoGeral = 0;
 
   const totaisPorLoja = {};
-  const osUnicasPorLoja = {}; 
+  
+  // Passo 1: Agrupar valores e itens por Loja e por OS para validar o total da OS
+  const osPorLojaEId = {}; 
 
   dadosFiltrados.forEach((item) => {
     const bruto = parseNumeroBR(item.VALORBRUTOPRODUTO);
@@ -218,11 +219,29 @@ function processarDadosBI(dados, dadosPagamentos) {
 
     const numeroOS = String(item.OS || "").trim();
     if (numeroOS) {
-      if (!osUnicasPorLoja[idLoja]) {
-        osUnicasPorLoja[idLoja] = new Set();
+      if (!osPorLojaEId[idLoja]) {
+        osPorLojaEId[idLoja] = {};
       }
-      osUnicasPorLoja[idLoja].add(numeroOS);
+      if (!osPorLojaEId[idLoja][numeroOS]) {
+        osPorLojaEId[idLoja][numeroOS] = 0; // Acumulador do valor bruto da OS
+      }
+      // Somamos o bruto dos itens desta OS para saber se o total dela é > 0
+      osPorLojaEId[idLoja][numeroOS] += bruto;
     }
+  });
+
+  // Passo 2: Filtrar apenas as OS cujo valor total bruto seja > 0 para a contagem de vendas
+  const osUnicasValidasPorLoja = {};
+  Object.keys(osPorLojaEId).forEach(idLoja => {
+    osUnicasValidasPorLoja[idLoja] = new Set();
+    const listaOSsDaLoja = osPorLojaEId[idLoja];
+    
+    Object.keys(listaOSsDaLoja).forEach(numeroOS => {
+      const valorTotalDaOS = listaOSsDaLoja[numeroOS];
+      if (valorTotalDaOS > 0) {
+        osUnicasValidasPorLoja[idLoja].add(numeroOS);
+      }
+    });
   });
 
   let htmlBrutoPorLoja = "";
@@ -233,7 +252,7 @@ function processarDadosBI(dados, dadosPagamentos) {
 
   Object.keys(totaisPorLoja).forEach(id => {
     const t = totaisPorLoja[id];
-    const qtdVendasLoja = osUnicasPorLoja[id] ? osUnicasPorLoja[id].size : 0;
+    const qtdVendasLoja = osUnicasValidasPorLoja[id] ? osUnicasValidasPorLoja[id].size : 0;
     totalGeralVendasOS += qtdVendasLoja;
 
     htmlBrutoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.bruto)}</span></div>`;
@@ -242,6 +261,7 @@ function processarDadosBI(dados, dadosPagamentos) {
     htmlQtdeVendasPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px;"><span><strong>${id}</strong></span> <span>${qtdVendasLoja}</span></div>`;
   });
 
+  // --- PROCESSAMENTO DA API DE PAGAMENTOS (MANTIDO) ---
   let htmlPagamentos = "";
   if (Array.isArray(dadosPagamentos) && dadosPagamentos.length > 0) {
     let pagamentosFiltrados = dadosPagamentos;
@@ -296,7 +316,6 @@ function processarDadosBI(dados, dadosPagamentos) {
 
         let linhasLojasHTML = Object.keys(item.lojas).map(idLoja => {
           const dadosLoja = item.lojas[idLoja];
-          
           totalGeralValorGrupo += dadosLoja.vendasValor;
           totalGeralQtdGrupo += dadosLoja.quantidadeVendas;
 
@@ -312,9 +331,9 @@ function processarDadosBI(dados, dadosPagamentos) {
         return `
           <div style="margin-bottom: 15px; background: #fafafa; padding: 10px; border-radius: 6px; border: 1px solid #eee;">
             <div style="font-size: 13px; font-weight: bold; color: #333; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 4px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-              <span>Meio Pagamento: <strong style="color: #0078d7;">${item.meioPagamento}</strong></span>
+              <span>Meio Pagamento: <strong style="color: #0078d7;">${item.meioPagamento}</sup></strong></span>
               <span>Parcelas: <strong style="color: #0078d7;">${item.nParcelas}</strong></span>
-              <span>Total vendas: <strong>${totalGeralQtdGrupo}</strong></span>
+              <span>Total vendas: <strong>${totalGoperalQtdGrupo || totalGeralQtdGrupo}</strong></span>
               <span>Valor Total: <strong style="color: #0078d7;">${formatarMoedaBR(totalGeralValorGrupo)}</strong></span>
             </div>
             <div style="display: flex; flex-direction: column; gap: 2px;">
