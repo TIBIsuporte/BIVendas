@@ -9,7 +9,8 @@ const SUPABASE_KEY = 'sb_publishable_biWjIRo9x6maeZXcoKX6Lw_l-fjV0wP';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let lojasDisponiveis = [];
-let meuGraficoLojas = null; // Variável global para gerenciar a instância do Chart.js
+let meuGraficoLojas = null;       // Instância do Chart.js para Lojas
+let meuGraficoPagamentos = null;  // Nova instância do Chart.js para Meios de Pagamento
 
 window.onload = async () => {
   await carregarLojasSupabase();
@@ -293,9 +294,9 @@ function processarDadosBI(dados, dadosPagamentos) {
   const ticketMedioGeral = totalGeralVendasOS > 0 ? (totalLiquidoGeral / totalGeralVendasOS) : 0;
 
   // --- PROCESSAMENTO DA API DE PAGAMENTOS ---
-  let htmlPagamentos = "";
+  let pagamentosFiltrados = [];
   if (Array.isArray(dadosPagamentos) && dadosPagamentos.length > 0) {
-    let pagamentosFiltrados = dadosPagamentos;
+    pagamentosFiltrados = dadosPagamentos;
     if (lojasDigitadas) {
       const idsFiltro = lojasDigitadas.split(",").map(id => id.trim());
       pagamentosFiltrados = dadosPagamentos.filter(pgto => {
@@ -309,76 +310,75 @@ function processarDadosBI(dados, dadosPagamentos) {
                idsFiltro.some(id => textoLojaPgto.toLowerCase().includes(id.toLowerCase()));
       });
     }
+  }
 
-    if (pagamentosFiltrados.length > 0) {
-      const agrupadoPagamentos = {};
+  let htmlPagamentos = "";
+  if (pagamentosFiltrados.length > 0) {
+    const agrupadoPagamentos = {};
 
-      pagamentosFiltrados.forEach(pgto => {
-        const meio = (pgto.MEIO_PAGAMENTO || pgto.MEIOPAGAMENTO || "NÃO ESPECIFICADO").trim();
-        const parcelas = (pgto.N_PARCELAS || "1").trim();
-        const chave = `${meio}|${parcelas}`;
+    pagamentosFiltrados.forEach(pgto => {
+      const meio = (pgto.MEIO_PAGAMENTO || pgto.MEIOPAGAMENTO || "NÃO ESPECIFICADO").trim();
+      const parcelas = (pgto.N_PARCELAS || "1").trim();
+      const chave = `${meio}|${parcelas}`;
 
-        const textoLojaPgto = String(pgto.LOJA || pgto.CODIGOLOJA || "Geral").trim();
-        const matchLojaPgto = textoLojaPgto.match(/^0*(\d+)/);
-        const idLoja = matchLojaPgto ? matchLojaPgto[1] : textoLojaPgto;
+      const textoLojaPgto = String(pgto.LOJA || pgto.CODIGOLOJA || "Geral").trim();
+      const matchLojaPgto = textoLojaPgto.match(/^0*(\d+)/);
+      const idLoja = matchLojaPgto ? matchLojaPgto[1] : textoLojaPgto;
 
-        const qtdUso = parseNumeroBR(pgto.QTDE_USO || 1);
-        const valorTotalPgto = parseNumeroBR(pgto.VENDAS_VALOR || 0);
+      const qtdUso = parseNumeroBR(pgto.QTDE_USO || 1);
+      const valorTotalPgto = parseNumeroBR(pgto.VENDAS_VALOR || 0);
 
-        if (!agrupadoPagamentos[chave]) {
-          agrupadoPagamentos[chave] = {
-            meioPagamento: meio,
-            nParcelas: parcelas,
-            lojas: {}
-          };
-        }
+      if (!agrupadoPagamentos[chave]) {
+        agrupadoPagamentos[chave] = {
+          meioPagamento: meio,
+          nParcelas: parcelas,
+          lojas: {}
+        };
+      }
 
-        if (!agrupadoPagamentos[chave].lojas[idLoja]) {
-          agrupadoPagamentos[chave].lojas[idLoja] = { quantidadeVendas: 0, vendasValor: 0 };
-        }
+      if (!agrupadoPagamentos[chave].lojas[idLoja]) {
+        agrupadoPagamentos[chave].lojas[idLoja] = { quantidadeVendas: 0, vendasValor: 0 };
+      }
 
-        agrupadoPagamentos[chave].lojas[idLoja].quantidadeVendas += qtdUso;
-        agrupadoPagamentos[chave].lojas[idLoja].vendasValor += valorTotalPgto;
-      });
+      agrupadoPagamentos[chave].lojas[idLoja].quantidadeVendas += qtdUso;
+      agrupadoPagamentos[chave].lojas[idLoja].vendasValor += valorTotalPgto;
+    });
 
-      htmlPagamentos = Object.values(agrupadoPagamentos).map(item => {
-        let totalGeralValorGrupo = 0;
-        let totalGeralQtdGrupo = 0;
+    htmlPagamentos = Object.values(agrupadoPagamentos).map(item => {
+      let totalGeralValorGrupo = 0;
+      let totalGeralQtdGrupo = 0;
 
-        let linhasLojasHTML = Object.keys(item.lojas).map(idLoja => {
-          const dadosLoja = item.lojas[idLoja];
-          totalGeralValorGrupo += dadosLoja.vendasValor;
-          totalGeralQtdGrupo += dadosLoja.quantidadeVendas;
-
-          return `
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px dashed #eee; font-size: 13px;">
-              <span style="font-weight: bold; min-width: 50px;">${idLoja}</span>
-              <span style="color: #333;">${formatarMoedaBR(dadosLoja.vendasValor)}</span>
-              <span style="color: #666; font-size: 12px;">Qtd Vendas: <strong>${dadosLoja.quantidadeVendas}</strong></span>
-            </div>
-          `;
-        }).join("");
+      let linhasLojasHTML = Object.keys(item.lojas).map(idLoja => {
+        const dadosLoja = item.lojas[idLoja];
+        totalGeralValorGrupo += dadosLoja.vendasValor;
+        totalGeralQtdGrupo += dadosLoja.quantidadeVendas;
 
         return `
-          <div style="margin-bottom: 15px; background: #fafafa; padding: 10px; border-radius: 6px; border: 1px solid #eee;">
-            <div style="font-size: 13px; font-weight: bold; color: #333; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 4px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-              <span>Meio Pagamento: <strong style="color: #0078d7;">${item.meioPagamento}</strong></span>
-              <span>Parcelas: <strong style="color: #0078d7;">${item.nParcelas}</strong></span>
-              <span>Total vendas: <strong>${totalGeralQtdGrupo}</strong></span>
-              <span>Valor Total: <strong style="color: #0078d7;">${formatarMoedaBR(totalGeralValorGrupo)}</strong></span>
-            </div>
-            <div style="display: flex; flex-direction: column; gap: 2px;">
-              ${linhasLojasHTML}
-            </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px dashed #eee; font-size: 13px;">
+            <span style="font-weight: bold; min-width: 50px;">${idLoja}</span>
+            <span style="color: #333;">${formatarMoedaBR(dadosLoja.vendasValor)}</span>
+            <span style="color: #666; font-size: 12px;">Qtd Vendas: <strong>${dadosLoja.quantidadeVendas}</strong></span>
           </div>
         `;
       }).join("");
 
-    } else {
-      htmlPagamentos = "Nenhum registro de pagamento para a(s) loja(s) selecionada(s).";
-    }
+      return `
+        <div style="margin-bottom: 15px; background: #fafafa; padding: 10px; border-radius: 6px; border: 1px solid #eee;">
+          <div style="font-size: 13px; font-weight: bold; color: #333; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 4px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <span>Meio Pagamento: <strong style="color: #0078d7;">${item.meioPagamento}</strong></span>
+            <span>Parcelas: <strong style="color: #0078d7;">${item.nParcelas}</strong></span>
+            <span>Total vendas: <strong>${totalGeralQtdGrupo}</strong></span>
+            <span>Valor Total: <strong style="color: #0078d7;">${formatarMoedaBR(totalGeralValorGrupo)}</strong></span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            ${linhasLojasHTML}
+          </div>
+        </div>
+      `;
+    }).join("");
+
   } else {
-    htmlPagamentos = "Nenhum registro de pagamento retornado para o período.";
+    htmlPagamentos = "Nenhum registro de pagamento para a(s) loja(s) selecionada(s).";
   }
   
   // Atualiza os cards no HTML
@@ -404,11 +404,11 @@ function processarDadosBI(dados, dadosPagamentos) {
   mudarAba('cards');
 
   // --- RENDERIZAÇÃO DO DASHBOARD (GRÁFICO + RANKINGS) ---
-  renderizarDashboard(totaisPorLoja, totalLiquidoGeral);
+  renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrados);
 }
 
 // --- FUNÇÃO PARA RENDERIZAR O DASHBOARD ---
-function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
+function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrados) {
   
   // 1. Processa e ordena as lojas da maior participação/líquido para a menor
   const listaLojasOrdenadas = Object.keys(totaisPorLoja).map(idLoja => {
@@ -427,7 +427,7 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
 
   listaLojasOrdenadas.sort((a, b) => b.liquido - a.liquido);
 
-  // 2. Atualiza o título do gráfico no HTML para exibir o valor total líquido ao lado
+  // 2. Atualiza o título do gráfico de lojas no HTML para exibir o valor total líquido ao lado
   const canvasGrafico = document.getElementById('graficoParticipacaoLojas');
   if (canvasGrafico) {
     const cardPai = canvasGrafico.closest('.card, div');
@@ -439,7 +439,7 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
     }
   }
 
-  // 3. Renderiza o Gráfico de Rosca Limpo
+  // 3. Renderiza o Gráfico de Rosca de Lojas
   const ctx = document.getElementById('graficoParticipacaoLojas');
   if (ctx) {
     const labels = listaLojasOrdenadas.map(item => `Loja ${item.idLoja}`);
@@ -482,7 +482,81 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
     });
   }
 
-  // 4. Renderiza o Ranking de Vendas por Composição (com Troféu/Medalhas)
+  // 4. Renderiza o Gráfico de Rosca de Meios de Pagamento
+  const containerPagamentosGrafico = document.getElementById('graficoParticipacaoPagamentos');
+  if (containerPagamentosGrafico && Array.isArray(pagamentosFiltrados) && pagamentosFiltrados.length > 0) {
+    
+    // Agrupa os valores totais por Meio de Pagamento
+    const totaisPorPagamento = {};
+    let valorTotalGeralPgto = 0;
+
+    pagamentosFiltrados.forEach(pgto => {
+      const meio = (pgto.MEIO_PAGAMENTO || pgto.MEIOPAGAMENTO || "NÃO ESPECIFICADO").trim();
+      const valor = parseNumeroBR(pgto.VENDAS_VALOR || 0);
+
+      totaisPorPagamento[meio] = (totaisPorPagamento[meio] || 0) + valor;
+      valorTotalGeralPgto += valor;
+    });
+
+    const listaPagamentosOrdenada = Object.keys(totaisPorPagamento).map(meio => {
+      const valor = totaisPorPagamento[meio];
+      const participacao = valorTotalGeralPgto > 0 ? (valor / valorTotalGeralPgto) * 100 : 0;
+      return { meio, valor, participacao };
+    });
+
+    // Ordena do maior valor para o menor
+    listaPagamentosOrdenada.sort((a, b) => b.valor - a.valor);
+
+    // Atualiza o título do card do gráfico de pagamentos com o valor total correspondente
+    const cardPgtoPai = containerPagamentosGrafico.closest('.card, div');
+    if (cardPgtoPai) {
+      const headerPgtoEl = cardPgtoPai.querySelector('h3, h4, .titulo-secao');
+      if (headerPgtoEl) {
+        headerPgtoEl.innerHTML = `Participação por Meio de Pagamento (%) — <span style="color: #0078d7; font-weight: bold;">${formatarMoedaBR(valorTotalGeralPgto)}</span>`;
+      }
+    }
+
+    const labelsPgto = listaPagamentosOrdenada.map(item => item.meio);
+    const dadosPgtoPorcentagem = listaPagamentosOrdenada.map(item => item.participacao.toFixed(2));
+    const coresPgto = [
+      '#5cb85c', '#0078d7', '#f0ad4e', '#d9534f', '#6f42c1', 
+      '#17a2b8', '#e83e8c', '#fd7e14', '#20c997', '#6610f2'
+    ];
+
+    if (meuGraficoPagamentos) {
+      meuGraficoPagamentos.destroy();
+    }
+
+    meuGraficoPagamentos = new Chart(containerPagamentosGrafico, {
+      type: 'doughnut',
+      data: {
+        labels: labelsPgto,
+        datasets: [{
+          label: '% por Meio de Pagamento',
+          data: dadosPgtoPorcentagem,
+          backgroundColor: coresPgto.slice(0, labelsPgto.length),
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right' },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const item = listaPagamentosOrdenada[context.dataIndex];
+                return ` ${context.label}: ${formatarMoedaBR(item.valor)} (${context.raw}% do total)`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // 5. Renderiza o Ranking de Vendas por Composição (com Troféu/Medalhas)
   const containerRankingVendas = document.getElementById('rankingVendasContainer');
   if (containerRankingVendas) {
     let htmlRankingVendas = "";
@@ -515,10 +589,9 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
     containerRankingVendas.innerHTML = htmlRankingVendas || "Nenhum dado para o ranking.";
   }
 
-  // 5. Renderiza o Ranking de Descontos Proporcionais (Menor taxa = 1º lugar)
+  // 6. Renderiza o Ranking de Descontos Proporcionais (Menor taxa = 1º lugar)
   const containerRankingDescontos = document.getElementById('rankingDescontosContainer');
   if (containerRankingDescontos) {
-    // Ordena do menor para o maior percentual de desconto
     const listaRankingDesconto = [...listaLojasOrdenadas].sort((a, b) => a.taxaDesconto - b.taxaDesconto);
 
     let htmlRankingDesc = "";
@@ -551,7 +624,6 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
 
     containerRankingDescontos.innerHTML = htmlRankingDesc || "Nenhum dado para o ranking.";
     
-    // Atualiza a legenda/descrição do ranking se houver elemento explicativo
     const cardDescPai = containerRankingDescontos.closest('.card, div');
     if (cardDescPai) {
       const descEl = cardDescPai.querySelector('p, .subtitulo-secao');
