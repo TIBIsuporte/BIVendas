@@ -9,7 +9,7 @@ const SUPABASE_KEY = 'sb_publishable_biWjIRo9x6maeZXcoKX6Lw_l-fjV0wP';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let lojasDisponiveis = [];
-let meuGraficoLojas = null;       // Instância do Chart.js para Lojas
+let meuGraficoLojas = null;         // Instância do Chart.js para Lojas
 let meuGraficoPagamentos = null;  // Nova instância do Chart.js para Meios de Pagamento
 
 window.onload = async () => {
@@ -20,25 +20,35 @@ window.onload = async () => {
 function mudarAba(aba) {
   const btnCards = document.getElementById("btnAbaCards");
   const btnDashboard = document.getElementById("btnAbaDashboard");
+  const btnDetalhes = document.getElementById("btnAbaDetalhes");
+  
   const conteudoCards = document.getElementById("conteudoAbaCards");
   const conteudoDashboard = document.getElementById("conteudoAbaDashboard");
+  const conteudoDetalhes = document.getElementById("conteudoAbaDetalhes");
+
+  // Oculta todos e reseta cores
+  conteudoCards.style.display = "none";
+  conteudoDashboard.style.display = "none";
+  if (conteudoDetalhes) conteudoDetalhes.style.display = "none";
+
+  btnCards.style.background = "#e0e0e0"; btnCards.style.color = "#333";
+  btnDashboard.style.background = "#e0e0e0"; btnDashboard.style.color = "#333";
+  if (btnDetalhes) { btnDetalhes.style.background = "#e0e0e0"; btnDetalhes.style.color = "#333"; }
 
   if (aba === 'cards') {
     conteudoCards.style.display = "flex";
-    conteudoDashboard.style.display = "none";
-    
     btnCards.style.background = "#0078d7";
     btnCards.style.color = "#fff";
-    btnDashboard.style.background = "#e0e0e0";
-    btnDashboard.style.color = "#333";
-  } else {
-    conteudoCards.style.display = "none";
+  } else if (aba === 'dashboard') {
     conteudoDashboard.style.display = "flex";
-    
     btnDashboard.style.background = "#0078d7";
     btnDashboard.style.color = "#fff";
-    btnCards.style.background = "#e0e0e0";
-    btnCards.style.color = "#333";
+  } else if (aba === 'detalhes') {
+    if (conteudoDetalhes) conteudoDetalhes.style.display = "flex";
+    if (btnDetalhes) {
+      btnDetalhes.style.background = "#0078d7";
+      btnDetalhes.style.color = "#fff";
+    }
   }
 }
 
@@ -403,6 +413,48 @@ function processarDadosBI(dados, dadosPagamentos) {
   document.getElementById("biCardsContainer").style.display = "flex";
   mudarAba('cards');
 
+  // --- POPULAR TABELA DA ABA 3 (DETALHES / AUDITORIA) ---
+  const tabelaDetalhesCorpo = document.getElementById("tabelaDetalhesCorpo");
+  const contadorRegistrosDetalhe = document.getElementById("contadorRegistrosDetalhe");
+
+  if (tabelaDetalhesCorpo) {
+    let htmlTabelaDetalhes = "";
+    dadosFiltrados.forEach(item => {
+      const lojaNome = item.LOJA || "-";
+      const os = item.OS || item.CODIGODAVENDA || "-";
+      const data = item.DATA || "-";
+      const cliente = item.CLIENTE || "-";
+      const vendedor = item.VENDEDOR || "-";
+      const produtoDesc = `${item.CODIGO || ''} - ${item.DESCRICAO || item.PRODUTO || '-'}`;
+      const qtd = item.QUANTIDADE || "0";
+      const bruto = parseNumeroBR(item.VALORBRUTOPRODUTO);
+      const desconto = parseNumeroBR(item.DESCPRODUTO);
+      const liquido = parseNumeroBR(item.LIQUIDOPRODUTO);
+      const tipoVenda = item.TIPOVENDA || "-";
+
+      htmlTabelaDetalhes += `
+        <tr style="border-bottom: 1px solid #eee;">
+          <td style="padding: 6px 8px; white-space: nowrap;">${lojaNome}</td>
+          <td style="padding: 6px 8px; font-weight: bold; color: #0078d7;">${os}</td>
+          <td style="padding: 6px 8px; white-space: nowrap;">${data}</td>
+          <td style="padding: 6px 8px;">${cliente}</td>
+          <td style="padding: 6px 8px;">${vendedor}</td>
+          <td style="padding: 6px 8px;">${produtoDesc}</td>
+          <td style="padding: 6px 8px; text-align: center;">${qtd}</td>
+          <td style="padding: 6px 8px; text-align: right;">${formatarMoedaBR(bruto)}</td>
+          <td style="padding: 6px 8px; text-align: right; color: #d9534f;">${formatarMoedaBR(desconto)}</td>
+          <td style="padding: 6px 8px; text-align: right; font-weight: bold; color: #28a745;">${formatarMoedaBR(liquido)}</td>
+          <td style="padding: 6px 8px; font-size: 11px; color: #666;">${tipoVenda}</td>
+        </tr>
+      `;
+    });
+
+    tabelaDetalhesCorpo.innerHTML = htmlTabelaDetalhes || "<tr><td colspan='11' style='text-align:center; padding: 20px;'>Nenhum registro encontrado.</td></tr>";
+    if (contadorRegistrosDetalhe) {
+      contadorRegistrosDetalhe.innerText = `Exibindo ${dadosFiltrados.length} registros`;
+    }
+  }
+
   // --- RENDERIZAÇÃO DO DASHBOARD (GRÁFICO + RANKINGS) ---
   renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrados);
 }
@@ -482,21 +534,17 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
     });
   }
 
-// 4. Renderiza o Gráfico de Rosca de Meios de Pagamento (Agrupado por Meio + Parcelas)
+  // 4. Renderiza o Gráfico de Rosca de Meios de Pagamento (Agrupado por Meio + Parcelas)
   const containerPagamentosGrafico = document.getElementById('graficoParticipacaoPagamentos');
   if (containerPagamentosGrafico && Array.isArray(pagamentosFiltrados) && pagamentosFiltrados.length > 0) {
     
-    // Agrupa os valores totais por Meio de Pagamento + Parcelas
     const totaisPorPagamentoParcelas = {};
     let valorTotalGeralPgto = 0;
 
     pagamentosFiltrados.forEach(pgto => {
       const meio = (pgto.MEIO_PAGAMENTO || pgto.MEIOPAGAMENTO || "NÃO ESPECIFICADO").trim();
       const parcelas = (pgto.N_PARCELAS || "A VISTA").trim();
-      
-      // Cria um rótulo descritivo exato, ex: "CARTAO (1 - PARCELA)" ou "DINHEIRO (A VISTA)"
       const rotuloCompleto = `${meio} (${parcelas})`;
-      
       const valor = parseNumeroBR(pgto.VENDAS_VALOR || 0);
 
       totaisPorPagamentoParcelas[rotuloCompleto] = (totaisPorPagamentoParcelas[rotuloCompleto] || 0) + valor;
@@ -509,14 +557,14 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
       return { rotulo, valor, participacao };
     });
 
-    // Ordena do maior valor para o menor
     listaPagamentosOrdenada.sort((a, b) => b.valor - a.valor);
 
-// Atualiza o título do card do gráfico de pagamentos usando o ID direto
+    // Atualiza o título do card do gráfico de pagamentos usando o ID direto
     const headerPgtoEl = document.getElementById('tituloGraficoPagamentos');
     if (headerPgtoEl) {
       headerPgtoEl.innerHTML = `Participação por Meio de Pagamento (%) — <span style="color: #0078d7; font-weight: bold;">${formatarMoedaBR(valorTotalGeralPgto)}</span>`;
-    } 
+    }
+
     const labelsPgto = listaPagamentosOrdenada.map(item => item.rotulo);
     const dadosPgtoPorcentagem = listaPagamentosOrdenada.map(item => item.participacao.toFixed(2));
     const coresPgto = [
@@ -556,40 +604,8 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
       }
     });
   }
-  // 5. Renderiza o Ranking de Vendas por Composição (com Troféu/Medalhas)
-  const containerRankingVendas = document.getElementById('rankingVendasContainer');
-  if (containerRankingVendas) {
-    let htmlRankingVendas = "";
-    listaLojasOrdenadas.forEach((item, index) => {
-      let iconePosicao = "";
-      let corBadge = "#666";
-      
-      if (index === 0) { iconePosicao = "🏆 "; corBadge = "#d4af37"; } 
-      else if (index === 1) { iconePosicao = "🥈 "; corBadge = "#aaa"; }
-      else if (index === 2) { iconePosicao = "🥉 "; corBadge = "#cd7f32"; }
 
-      let posicaoNumero = `#${index + 1}`;
-
-      htmlRankingVendas += `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; margin-bottom: 6px; background: #fff; border: 1px solid #e0e0e0; border-radius: 6px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-weight: bold; color: ${index < 3 ? corBadge : '#333'}; font-size: 13px; min-width: 35px;">${posicaoNumero}</span>
-            <div>
-              <strong style="color: ${corBadge};">${iconePosicao}Loja ${item.idLoja}</strong>
-              <div style="font-size: 11px; color: #666;">Composição: ${item.participacao.toFixed(1)}% do total</div>
-            </div>
-          </div>
-          <div style="text-align: right;">
-            <span style="font-size: 14px; font-weight: bold; color: #0078d7;">${formatarMoedaBR(item.liquido)}</span>
-            <div style="font-size: 10px; color: #888;">Valor Líquido</div>
-          </div>
-        </div>
-      `;
-    });
-    containerRankingVendas.innerHTML = htmlRankingVendas || "Nenhum dado para o ranking.";
-  }
-
-  // 6. Renderiza o Ranking de Descontos Proporcionais (Menor taxa = 1º lugar)
+  // 5. Renderiza o Ranking de Descontos Proporcionais (Menor taxa = 1º lugar)
   const containerRankingDescontos = document.getElementById('rankingDescontosContainer');
   if (containerRankingDescontos) {
     const listaRankingDesconto = [...listaLojasOrdenadas].sort((a, b) => a.taxaDesconto - b.taxaDesconto);
@@ -623,13 +639,5 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
     });
 
     containerRankingDescontos.innerHTML = htmlRankingDesc || "Nenhum dado para o ranking.";
-    
-    const cardDescPai = containerRankingDescontos.closest('.card, div');
-    if (cardDescPai) {
-      const descEl = cardDescPai.querySelector('p, .subtitulo-secao');
-      if (descEl) {
-        descEl.innerText = "Lojas ordenadas pela menor taxa de desconto proporcional sobre o valor bruto.";
-      }
-    }
   }
 }
