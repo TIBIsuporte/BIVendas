@@ -482,44 +482,49 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
     });
   }
 
-  // 4. Renderiza o Gráfico de Rosca de Meios de Pagamento
+// 4. Renderiza o Gráfico de Rosca de Meios de Pagamento (Agrupado por Meio + Parcelas)
   const containerPagamentosGrafico = document.getElementById('graficoParticipacaoPagamentos');
   if (containerPagamentosGrafico && Array.isArray(pagamentosFiltrados) && pagamentosFiltrados.length > 0) {
     
-    // Agrupa os valores totais por Meio de Pagamento
-    const totaisPorPagamento = {};
+    // Agrupa os valores totais por Meio de Pagamento + Parcelas
+    const totaisPorPagamentoParcelas = {};
     let valorTotalGeralPgto = 0;
 
     pagamentosFiltrados.forEach(pgto => {
       const meio = (pgto.MEIO_PAGAMENTO || pgto.MEIOPAGAMENTO || "NÃO ESPECIFICADO").trim();
+      const parcelas = (pgto.N_PARCELAS || "A VISTA").trim();
+      
+      // Cria um rótulo descritivo exato, ex: "CARTAO (1 - PARCELA)" ou "DINHEIRO (A VISTA)"
+      const rotuloCompleto = `${meio} (${parcelas})`;
+      
       const valor = parseNumeroBR(pgto.VENDAS_VALOR || 0);
 
-      totaisPorPagamento[meio] = (totaisPorPagamento[meio] || 0) + valor;
+      totaisPorPagamentoParcelas[rotuloCompleto] = (totaisPorPagamentoParcelas[rotuloCompleto] || 0) + valor;
       valorTotalGeralPgto += valor;
     });
 
-    const listaPagamentosOrdenada = Object.keys(totaisPorPagamento).map(meio => {
-      const valor = totaisPorPagamento[meio];
+    const listaPagamentosOrdenada = Object.keys(totaisPorPagamentoParcelas).map(rotulo => {
+      const valor = totaisPorPagamentoParcelas[rotulo];
       const participacao = valorTotalGeralPgto > 0 ? (valor / valorTotalGeralPgto) * 100 : 0;
-      return { meio, valor, participacao };
+      return { rotulo, valor, participacao };
     });
 
     // Ordena do maior valor para o menor
     listaPagamentosOrdenada.sort((a, b) => b.valor - a.valor);
 
-    // Atualiza o título do card do gráfico de pagamentos com o valor total correspondente
+    // Atualiza o título do card do gráfico com o valor total correspondente
     const cardPgtoPai = containerPagamentosGrafico.closest('.card, div');
     if (cardPgtoPai) {
       const headerPgtoEl = cardPgtoPai.querySelector('h3, h4, .titulo-secao');
       if (headerPgtoEl) {
-        headerPgtoEl.innerHTML = `Participação por Meio de Pagamento (%) — <span style="color: #0078d7; font-weight: bold;">${formatarMoedaBR(valorTotalGeralPgto)}</span>`;
+        headerPgtoEl.innerHTML = `Participação por Meio e Parcelas (%) — <span style="color: #0078d7; font-weight: bold;">${formatarMoedaBR(valorTotalGeralPgto)}</span>`;
       }
     }
 
-    const labelsPgto = listaPagamentosOrdenada.map(item => item.meio);
+    const labelsPgto = listaPagamentosOrdenada.map(item => item.rotulo);
     const dadosPgtoPorcentagem = listaPagamentosOrdenada.map(item => item.participacao.toFixed(2));
     const coresPgto = [
-      '#5cb85c', '#0078d7', '#f0ad4e', '#d9534f', '#6f42c1', 
+      '#0078d7', '#5cb85c', '#f0ad4e', '#d9534f', '#6f42c1', 
       '#17a2b8', '#e83e8c', '#fd7e14', '#20c997', '#6610f2'
     ];
 
@@ -532,7 +537,7 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
       data: {
         labels: labelsPgto,
         datasets: [{
-          label: '% por Meio de Pagamento',
+          label: '% por Pagamento',
           data: dadosPgtoPorcentagem,
           backgroundColor: coresPgto.slice(0, labelsPgto.length),
           borderWidth: 1
@@ -547,7 +552,7 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
             callbacks: {
               label: function(context) {
                 const item = listaPagamentosOrdenada[context.dataIndex];
-                return ` ${context.label}: ${formatarMoedaBR(item.valor)} (${context.raw}% do total)`;
+                return ` ${context.rotulo}: ${formatarMoedaBR(item.valor)} (${context.raw}% do total)`;
               }
             }
           }
@@ -555,7 +560,6 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
       }
     });
   }
-
   // 5. Renderiza o Ranking de Vendas por Composição (com Troféu/Medalhas)
   const containerRankingVendas = document.getElementById('rankingVendasContainer');
   if (containerRankingVendas) {
