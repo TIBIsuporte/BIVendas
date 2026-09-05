@@ -427,7 +427,19 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
 
   listaLojasOrdenadas.sort((a, b) => b.liquido - a.liquido);
 
-  // 2. Renderiza o Gráfico de Rosca com centralização exata no miolo
+  // 2. Atualiza o título do gráfico no HTML para exibir o valor total líquido ao lado
+  const canvasGrafico = document.getElementById('graficoParticipacaoLojas');
+  if (canvasGrafico) {
+    const cardPai = canvasGrafico.closest('.card, div');
+    if (cardPai) {
+      const headerEl = cardPai.querySelector('h3, h4, .titulo-secao') || cardPai.previousElementSibling;
+      if (headerEl) {
+        headerEl.innerHTML = `Participação do Valor Líquido por Loja (%) — <span style="color: #0078d7; font-weight: bold;">${formatarMoedaBR(totalLiquidoGeral)}</span>`;
+      }
+    }
+  }
+
+  // 3. Renderiza o Gráfico de Rosca Limpo
   const ctx = document.getElementById('graficoParticipacaoLojas');
   if (ctx) {
     const labels = listaLojasOrdenadas.map(item => `Loja ${item.idLoja}`);
@@ -440,38 +452,6 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
     if (meuGraficoLojas) {
       meuGraficoLojas.destroy();
     }
-
-    const centroTotalPlugin = {
-      id: 'centroTotalPlugin',
-      beforeDraw: function(chart) {
-        const width = chart.width;
-        const height = chart.height;
-        const ctx = chart.ctx;
-        ctx.restore();
-        
-        // Coordenadas exatas do centro do canvas do gráfico
-        const centerX = width / 2;
-        const centerY = height / 2;
-        
-        const fontSize = (height / 130).toFixed(2);
-        ctx.font = `bold ${fontSize}em sans-serif`;
-        ctx.textBaseline = 'middle';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#333';
-
-        const textoPrincipal = formatarMoedaBR(totalLiquidoGeral);
-        const textoSub = "Total Líquido";
-
-        // Desenha perfeitamente alinhado no centro absoluto do gráfico
-        ctx.fillText(textoPrincipal, centerX, centerY - 10);
-
-        ctx.font = `bold ${fontSize * 0.45}em sans-serif`;
-        ctx.fillStyle = '#666';
-        ctx.fillText(textoSub, centerX, centerY + 16);
-        
-        ctx.save();
-      }
-    };
 
     meuGraficoLojas = new Chart(ctx, {
       type: 'doughnut',
@@ -498,12 +478,11 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
             }
           }
         }
-      },
-      plugins: [centroTotalPlugin]
+      }
     });
   }
 
-  // 3. Renderiza o Ranking de Vendas por Composição (com Troféu/Medalhas ao lado da identificação)
+  // 4. Renderiza o Ranking de Vendas por Composição (com Troféu/Medalhas)
   const containerRankingVendas = document.getElementById('rankingVendasContainer');
   if (containerRankingVendas) {
     let htmlRankingVendas = "";
@@ -536,7 +515,7 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
     containerRankingVendas.innerHTML = htmlRankingVendas || "Nenhum dado para o ranking.";
   }
 
-  // 4. Renderiza o Ranking de Descontos Proporcionais (com Troféu/Medalhas ao lado da identificação)
+  // 5. Renderiza o Ranking de Descontos Proporcionais (com Troféu/Medalhas)
   const containerRankingDescontos = document.getElementById('rankingDescontosContainer');
   if (containerRankingDescontos) {
     const listaRankingDesconto = [...listaLojasOrdenadas].sort((a, b) => b.taxaDesconto - a.taxaDesconto);
