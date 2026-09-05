@@ -515,10 +515,11 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
     containerRankingVendas.innerHTML = htmlRankingVendas || "Nenhum dado para o ranking.";
   }
 
-  // 5. Renderiza o Ranking de Descontos Proporcionais (com Troféu/Medalhas)
+// 5. Renderiza o Ranking de Descontos Proporcionais (Menor taxa = 1º lugar)
   const containerRankingDescontos = document.getElementById('rankingDescontosContainer');
   if (containerRankingDescontos) {
-    const listaRankingDesconto = [...listaLojasOrdenadas].sort((a, b) => b.taxaDesconto - a.taxaDesconto);
+    // Ordena do menor para o maior percentual de desconto
+    const listaRankingDesconto = [...listaLojasOrdenadas].sort((a, b) => a.taxaDesconto - b.taxaDesconto);
 
     let htmlRankingDesc = "";
     listaRankingDesconto.forEach((item, index) => {
@@ -541,7 +542,7 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
             </div>
           </div>
           <div style="text-align: right;">
-            <span style="font-size: 14px; font-weight: bold; color: #d9534f;">${item.taxaDesconto.toFixed(2)}%</span>
+            <span style="font-size: 14px; font-weight: bold; color: #28a745;">${item.taxaDesconto.toFixed(2)}%</span>
             <div style="font-size: 10px; color: #888;">Taxa Média</div>
           </div>
         </div>
@@ -549,5 +550,13 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
     });
 
     containerRankingDescontos.innerHTML = htmlRankingDesc || "Nenhum dado para o ranking.";
+    
+    // Atualiza a legenda/descrição do ranking se houver elemento explicativo
+    const cardDescPai = containerRankingDescontos.closest('.card, div');
+    if (cardDescPai) {
+      const descEl = cardDescPai.querySelector('p, .subtitulo-secao');
+      if (descEl) {
+        descEl.innerText = "Lojas ordenadas pela menor taxa de desconto proporcional sobre o valor bruto.";
+      }
+    }
   }
-}
