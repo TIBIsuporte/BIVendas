@@ -512,14 +512,11 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
     // Ordena do maior valor para o menor
     listaPagamentosOrdenada.sort((a, b) => b.valor - a.valor);
 
-    // Atualiza o título do card do gráfico com o valor total correspondente ao lado (igual ao de lojas)
-    const cardPgtoPai = containerPagamentosGrafico.closest('.card, div');
-    if (cardPgtoPai) {
-      const headerPgtoEl = cardPgtoPai.querySelector('h3, h4, .titulo-secao');
-      if (headerPgtoEl) {
-        headerPgtoEl.innerHTML = `Participação por Meio de Pagamento (%) — <span style="color: #0078d7; font-weight: bold;">${formatarMoedaBR(valorTotalGeralPgto)}</span>`;
-      }
-    }
+// Atualiza o título do card do gráfico de pagamentos usando o ID direto
+    const headerPgtoEl = document.getElementById('tituloGraficoPagamentos');
+    if (headerPgtoEl) {
+      headerPgtoEl.innerHTML = `Participação por Meio de Pagamento (%) — <span style="color: #0078d7; font-weight: bold;">${formatarMoedaBR(valorTotalGeralPgto)}</span>`;
+    } 
     const labelsPgto = listaPagamentosOrdenada.map(item => item.rotulo);
     const dadosPgtoPorcentagem = listaPagamentosOrdenada.map(item => item.participacao.toFixed(2));
     const coresPgto = [
