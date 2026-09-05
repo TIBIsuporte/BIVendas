@@ -427,7 +427,7 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
 
   listaLojasOrdenadas.sort((a, b) => b.liquido - a.liquido);
 
-  // 2. Renderiza o Gráfico de Rosca com correção de centralização do texto
+  // 2. Renderiza o Gráfico de Rosca com centralização exata no miolo
   const ctx = document.getElementById('graficoParticipacaoLojas');
   if (ctx) {
     const labels = listaLojasOrdenadas.map(item => `Loja ${item.idLoja}`);
@@ -444,14 +444,14 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
     const centroTotalPlugin = {
       id: 'centroTotalPlugin',
       beforeDraw: function(chart) {
+        const width = chart.width;
         const height = chart.height;
-        const chartArea = chart.chartArea;
         const ctx = chart.ctx;
         ctx.restore();
         
-        // Centro exato considerando a área útil do gráfico (ignorando a legenda lateral)
-        const centerX = (chartArea.left + chartArea.right) / 2;
-        const centerY = (chartArea.top + chartArea.bottom) / 2;
+        // Coordenadas exatas do centro do canvas do gráfico
+        const centerX = width / 2;
+        const centerY = height / 2;
         
         const fontSize = (height / 130).toFixed(2);
         ctx.font = `bold ${fontSize}em sans-serif`;
@@ -462,7 +462,7 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
         const textoPrincipal = formatarMoedaBR(totalLiquidoGeral);
         const textoSub = "Total Líquido";
 
-        // Desenha valor e subtítulo perfeitamente centralizados no miolo da rosca
+        // Desenha perfeitamente alinhado no centro absoluto do gráfico
         ctx.fillText(textoPrincipal, centerX, centerY - 10);
 
         ctx.font = `bold ${fontSize * 0.45}em sans-serif`;
@@ -503,7 +503,7 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
     });
   }
 
-  // 3. Renderiza o Ranking de Vendas por Composição
+  // 3. Renderiza o Ranking de Vendas por Composição (com Troféu/Medalhas ao lado da identificação)
   const containerRankingVendas = document.getElementById('rankingVendasContainer');
   if (containerRankingVendas) {
     let htmlRankingVendas = "";
@@ -515,7 +515,6 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
       else if (index === 1) { iconePosicao = "🥈 "; corBadge = "#aaa"; }
       else if (index === 2) { iconePosicao = "🥉 "; corBadge = "#cd7f32"; }
 
-      let textoIdentificacao = `${iconePosicao}Loja ${item.idLoja}`;
       let posicaoNumero = `#${index + 1}`;
 
       htmlRankingVendas += `
@@ -523,7 +522,7 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
           <div style="display: flex; align-items: center; gap: 10px;">
             <span style="font-weight: bold; color: ${index < 3 ? corBadge : '#333'}; font-size: 13px; min-width: 35px;">${posicaoNumero}</span>
             <div>
-              <strong style="color: ${corBadge};">${textoIdentificacao}</strong>
+              <strong style="color: ${corBadge};">${iconePosicao}Loja ${item.idLoja}</strong>
               <div style="font-size: 11px; color: #666;">Composição: ${item.participacao.toFixed(1)}% do total</div>
             </div>
           </div>
@@ -537,7 +536,7 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
     containerRankingVendas.innerHTML = htmlRankingVendas || "Nenhum dado para o ranking.";
   }
 
-  // 4. Renderiza o Ranking de Descontos Proporcionais
+  // 4. Renderiza o Ranking de Descontos Proporcionais (com Troféu/Medalhas ao lado da identificação)
   const containerRankingDescontos = document.getElementById('rankingDescontosContainer');
   if (containerRankingDescontos) {
     const listaRankingDesconto = [...listaLojasOrdenadas].sort((a, b) => b.taxaDesconto - a.taxaDesconto);
@@ -551,7 +550,6 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
       else if (index === 1) { iconePosicao = "🥈 "; corBadge = "#aaa"; }
       else if (index === 2) { iconePosicao = "🥉 "; corBadge = "#cd7f32"; }
 
-      let textoIdentificacao = `${iconePosicao}Loja ${item.idLoja}`;
       let posicaoNumero = `#${index + 1}`;
 
       htmlRankingDesc += `
@@ -559,7 +557,7 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
           <div style="display: flex; align-items: center; gap: 10px;">
             <span style="font-weight: bold; color: ${index < 3 ? corBadge : '#333'}; font-size: 13px; min-width: 35px;">${posicaoNumero}</span>
             <div>
-              <strong style="color: ${corBadge};">${textoIdentificacao}</strong>
+              <strong style="color: ${corBadge};">${iconePosicao}Loja ${item.idLoja}</strong>
               <div style="font-size: 11px; color: #666;">Desc: ${formatarMoedaBR(item.desconto)} / Bruto: ${formatarMoedaBR(item.bruto)}</div>
             </div>
           </div>
