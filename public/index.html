@@ -96,31 +96,31 @@
 
   </div>
 
- <!-- === ABA 2: DASHBOARD EXECUTIVO (Gráficos + Rankings) === -->
+  <!-- === ABA 2: DASHBOARD EXECUTIVO (Gráficos + Rankings) === -->
   <div id="conteudoAbaDashboard" style="display: none; flex-direction: column; gap: 20px;">
     
-    <!-- Linha 1: Gráficos de Rosca Lado a Lado -->
+    <!-- Linha 1: Os dois Gráficos de Rosca Lado a Lado -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px;">
       
-      <!-- Gráfico 1: Lojas -->
+      <!-- Gráfico 1: Participação por Loja -->
       <div style="background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
         <h3 style="margin-top: 0; color: #333; font-size: 16px; border-bottom: 1px solid #eee; padding-bottom: 10px;">Participação do Valor Líquido por Loja (%)</h3>
-        <div style="position: relative; width: 100%; height: 280px; margin-top: 10px;">
+        <div style="position: relative; width: 100%; height: 300px; margin-top: 10px;">
           <canvas id="graficoParticipacaoLojas"></canvas>
         </div>
       </div>
 
-      <!-- Gráfico 2: Meios de Pagamento -->
+      <!-- Gráfico 2: Participação por Meio de Pagamento (NOVO) -->
       <div style="background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
         <h3 style="margin-top: 0; color: #333; font-size: 16px; border-bottom: 1px solid #eee; padding-bottom: 10px;">Participação por Meio de Pagamento (%)</h3>
-        <div style="position: relative; width: 100%; height: 280px; margin-top: 10px;">
+        <div style="position: relative; width: 100%; height: 300px; margin-top: 10px;">
           <canvas id="graficoParticipacaoPagamentos"></canvas>
         </div>
       </div>
 
     </div>
 
-    <!-- Linha 2: Rankings (Descontos, etc.) -->
+    <!-- Linha 2: Rankings (Ex: Concessão de Desconto) -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px;">
       
       <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
@@ -133,6 +133,34 @@
 
     </div>
 
+  </div>
+</div>
+
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text">Buscando relatório na API, por favor aguarde...</div>
+  </div>
+
+  <div id="modalLojas" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span>Selecionar Lojas</span>
+      </div>
+      <div class="modal-busca-container">
+        <label>Filtrar por Código, Nome da Loja ou Gerente:</label>
+        <input type="text" id="inputFiltroGerenteModal" placeholder="Digite para filtrar..." onkeyup="filtrarLojasNoModal()">
+      </div>
+      <div style="margin-bottom: 8px;">
+        <label style="font-size: 13px; cursor: pointer; font-weight: bold; display: flex; justify-content: flex-start; gap: 8px;">
+          <input type="checkbox" id="selecionarTodasLojas" onclick="toggleSelecionarTodasLojas(this)" style="width: auto;"> Selecionar / Desmarcar Lojas Visíveis
+        </label>
+      </div>
+      <div class="modal-body" id="listaLojasModal"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secundario" onclick="fecharModalLojas()">Cancelar</button>
+        <button type="button" onclick="confirmarSelecaoLojas()">Confirmar</button>
+      </div>
+    </div>
   </div>
 
   <script src="/js/lojas-modal.js"></script>
