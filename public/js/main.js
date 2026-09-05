@@ -515,7 +515,7 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
     containerRankingVendas.innerHTML = htmlRankingVendas || "Nenhum dado para o ranking.";
   }
 
-// 5. Renderiza o Ranking de Descontos Proporcionais (Menor taxa = 1º lugar)
+  // 5. Renderiza o Ranking de Descontos Proporcionais (Menor taxa = 1º lugar)
   const containerRankingDescontos = document.getElementById('rankingDescontosContainer');
   if (containerRankingDescontos) {
     // Ordena do menor para o maior percentual de desconto
@@ -560,3 +560,4 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral) {
       }
     }
   }
+}
