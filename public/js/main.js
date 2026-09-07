@@ -496,39 +496,58 @@ function processarDadosBI(dados, dadosPagamentos) {
     // Popula o objeto global para o modal de zoom usar
     dadosPagamentosPorLojaGlobal = agrupadoPagamentos;
 
-    htmlPagamentos = Object.keys(agrupadoPagamentos).map(chaveReal => {
+htmlPagamentos = Object.keys(agrupadoPagamentos).map(chaveReal => {
       const item = agrupadoPagamentos[chaveReal];
       let totalGeralValorGrupo = 0;
       let totalGeralQtdGrupo = 0;
 
-      let linhasLojasHTML = Object.keys(item.lojas).map(idLoja => {
+      // Calcula os totais primeiro para exibir no cabeçalho compacto
+      Object.keys(item.lojas).forEach(idLoja => {
         const dadosLoja = item.lojas[idLoja];
         totalGeralValorGrupo += dadosLoja.vendasValor;
         totalGeralQtdGrupo += dadosLoja.quantidadeVendas;
+      });
 
+      let linhasLojasHTML = Object.keys(item.lojas).map(idLoja => {
+        const dadosLoja = item.lojas[idLoja];
         return `
-          <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px dashed #eee; font-size: 13px;">
-            <span style="font-weight: bold; min-width: 50px;">${idLoja}</span>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; border-bottom: 1px dashed #eee; font-size: 13px; background: #fff;">
+            <span style="font-weight: bold; color: #555;">Loja ${idLoja}</span>
             <span style="color: #333;">${formatarMoedaBR(dadosLoja.vendasValor)}</span>
             <span style="color: #666; font-size: 12px;">Qtd Vendas: <strong>${dadosLoja.quantidadeVendas}</strong></span>
           </div>
         `;
       }).join("");
 
+      // ID único seguro para manipular o elemento no DOM
+      const idUnico = 'acordeon_' + chaveReal.replace(/[^a-zA-Z0-9]/g, '_');
+
       return `
-        <div style="margin-bottom: 15px; background: #fafafa; padding: 10px; border-radius: 6px; border: 1px solid #eee;">
-          <div style="font-size: 13px; font-weight: bold; color: #333; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 4px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-            <span>Meio Pagamento: <strong style="color: #0078d7;">${item.meioPagamento}</strong></span>
-            <span>Parcelas: <strong style="color: #0078d7;">${item.nParcelas}</strong></span>
-            <span>Total vendas: <strong>${totalGeralQtdGrupo}</strong></span>
-            <span>Valor Total: <strong style="color: #0078d7;">${formatarMoedaBR(totalGeralValorGrupo)}</strong></span>
+        <div style="margin-bottom: 10px; background: #fafafa; border-radius: 6px; border: 1px solid #e0e0e0; overflow: hidden;">
+          
+          <!-- CABEÇALHO COMPACTO (CLICÁVEL PARA EXPANDIR/RECOLHER) -->
+          <div onclick="toggleAcordeon('${idUnico}')" style="padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #fdfdfd; user-select: none;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span id="seta_${idUnico}" style="font-size: 14px; font-weight: bold; transition: transform 0.2s; display: inline-block;">▶</span>
+              <span style="font-size: 13px; font-weight: bold; color: #333;">${item.meioPagamento} <span style="color: #666; font-weight: normal;">(${item.nParcelas})</span></span>
+            </div>
+            
+            <div style="display: flex; gap: 20px; align-items: center; font-size: 13px;">
+              <span style="color: #555;">Total Vendas: <strong>${totalGeralQtdGrupo}</strong></span>
+              <span style="color: #0078d7; font-weight: bold;">${formatarMoedaBR(totalGeralValorGrupo)}</span>
+            </div>
           </div>
-          <div style="display: flex; flex-direction: column; gap: 2px;">
-            ${linhasLojasHTML}
+
+          <!-- CONTEÚDO OCULTO (ABAIXO) COM AS LOJAS -->
+          <div id="${idUnico}" style="display: none; border-top: 1px solid #eee; background: #fff;">
+            <div style="padding: 4px 0;">
+              ${linhasLojasHTML}
+            </div>
+            <div style="padding: 8px 12px; background: #f9f9f9; text-align: right; border-top: 1px solid #eee;">
+              <button type="button" onclick="abrirModalZoom('${chaveReal}')" style="background: #0078d7; color: #fff; border: none; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer;">🔍 Ver Gráficos por Loja</button>
+            </div>
           </div>
-          <div style="margin-top: 8px; text-align: right;">
-            <button type="button" onclick="abrirModalZoom('${chaveReal}')" style="background: #0078d7; color: #fff; border: none; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer;">🔍 Ver Gráficos por Loja</button>
-          </div>
+
         </div>
       `;
     }).join("");
@@ -784,5 +803,19 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
     });
 
     containerRankingDescontos.innerHTML = htmlRankingDesc || "Nenhum dado para o ranking.";
+  }
+}
+
+// --- FUNÇÃO PARA O ACORDEON DE PAGAMENTOS ---
+function toggleAcordeon(idUnico) {
+  const elemento = document.getElementById(idUnico);
+  const seta = document.getElementById('seta_' + idUnico);
+  
+  if (elemento.style.display === "none") {
+    elemento.style.display = "block";
+    seta.style.transform = "rotate(90deg)"; // Aponta para baixo
+  } else {
+    elemento.style.display = "none";
+    seta.style.transform = "rotate(0deg)";  // Aponta para o lado
   }
 }
