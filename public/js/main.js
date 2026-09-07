@@ -9,8 +9,10 @@ const SUPABASE_KEY = 'sb_publishable_biWjIRo9x6maeZXcoKX6Lw_l-fjV0wP';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let lojasDisponiveis = [];
-let meuGraficoLojas = null;         // Instância do Chart.js para Lojas
+let meuGraficoLojas = null;          // Instância do Chart.js para Lojas
 let meuGraficoPagamentos = null;  // Nova instância do Chart.js para Meios de Pagamento
+let dadosPagamentosPorLojaGlobal = {}; // Armazena a quebra para o zoom
+let meuGraficoZoomPagamento = null;    // Instância do gráfico de zoom
 
 window.onload = async () => {
   await carregarLojasSupabase();
@@ -131,6 +133,74 @@ function confirmarSelecaoLojas() {
   fecharModalLojas();
 }
 // ---------------------------------
+
+// --- FUNÇÕES DO MODAL DE ZOOM DE PAGAMENTO ---
+function abrirModalZoom(rotuloChave) {
+  const dadosDoGrupo = dadosPagamentosPorLojaGlobal[rotuloChave];
+  if (!dadosDoGrupo) return;
+
+  const tituloEl = document.getElementById("tituloModalZoom");
+  if (tituloEl) {
+    tituloEl.innerText = `Detalhes por Loja — ${rotuloChave}`;
+  }
+
+  const modal = document.getElementById("modalZoomPagamento");
+  if (modal) modal.style.display = "flex";
+
+  const ctxZoom = document.getElementById("graficoZoomPagamentoLoja");
+  if (ctxZoom) {
+    const lojasIds = Object.keys(dadosDoGrupo.lojas);
+    const valoresLojas = lojasIds.map(id => dadosDoGrupo.lojas[id].vendasValor);
+    const labelsLojas = lojasIds.map(id => `Loja ${id}`);
+
+    if (meuGraficoZoomPagamento) {
+      meuGraficoZoomPagamento.destroy();
+    }
+
+    meuGraficoZoomPagamento = new Chart(ctxZoom, {
+      type: 'bar',
+      data: {
+        labels: labelsLojas,
+        datasets: [{
+          label: 'Valor de Vendas (R$)',
+          data: valoresLojas,
+          backgroundColor: '#0078d7',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                return ` Valor: ${formatarMoedaBR(context.raw)}`;
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function(value) {
+                return 'R$ ' + value.toLocaleString('pt-BR');
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+}
+
+function fecharModalZoom() {
+  const modal = document.getElementById("modalZoomPagamento");
+  if (modal) modal.style.display = "none";
+}
+// ---------------------------------------------
 
 function formatarDataISOparaBR(dataISO) {
   if (!dataISO) return "";
@@ -305,6 +375,8 @@ function processarDadosBI(dados, dadosPagamentos) {
 
   // --- PROCESSAMENTO DA API DE PAGAMENTOS ---
   let pagamentosFiltrados = [];
+  dadosPagamentosPorLojaGlobal = {}; // Reseta o cache global do zoom
+
   if (Array.isArray(dadosPagamentos) && dadosPagamentos.length > 0) {
     pagamentosFiltrados = dadosPagamentos;
     if (lojasDigitadas) {
@@ -329,7 +401,7 @@ function processarDadosBI(dados, dadosPagamentos) {
     pagamentosFiltrados.forEach(pgto => {
       const meio = (pgto.MEIO_PAGAMENTO || pgto.MEIOPAGAMENTO || "NÃO ESPECIFICADO").trim();
       const parcelas = (pgto.N_PARCELAS || "1").trim();
-      const chave = `${meio}|${parcelas}`;
+      const chave = `${meio} (${parcelas})*`; // Mantém compatibilidade com a chave do gráfico
 
       const textoLojaPgto = String(pgto.LOJA || pgto.CODIGOLOJA || "Geral").trim();
       const matchLojaPgto = textoLojaPgto.match(/^0*(\d+)/);
@@ -338,23 +410,29 @@ function processarDadosBI(dados, dadosPagamentos) {
       const qtdUso = parseNumeroBR(pgto.QTDE_USO || 1);
       const valorTotalPgto = parseNumeroBR(pgto.VENDAS_VALOR || 0);
 
-      if (!agrupadoPagamentos[chave]) {
-        agrupadoPagamentos[chave] = {
+      const chaveReal = `${meio}|${parcelas}`;
+
+      if (!agrupadoPagamentos[chaveReal]) {
+        agrupadoPagamentos[chaveReal] = {
           meioPagamento: meio,
           nParcelas: parcelas,
           lojas: {}
         };
       }
 
-      if (!agrupadoPagamentos[chave].lojas[idLoja]) {
-        agrupadoPagamentos[chave].lojas[idLoja] = { quantidadeVendas: 0, vendasValor: 0 };
+      if (!agrupadoPagamentos[chaveReal].lojas[idLoja]) {
+        agrupadoPagamentos[chaveReal].lojas[idLoja] = { quantidadeVendas: 0, vendasValor: 0 };
       }
 
-      agrupadoPagamentos[chave].lojas[idLoja].quantidadeVendas += qtdUso;
-      agrupadoPagamentos[chave].lojas[idLoja].vendasValor += valorTotalPgto;
+      agrupadoPagamentos[chaveReal].lojas[idLoja].quantidadeVendas += qtdUso;
+      agrupadoPagamentos[chaveReal].lojas[idLoja].vendasValor += valorTotalPgto;
     });
 
-    htmlPagamentos = Object.values(agrupadoPagamentos).map(item => {
+    // Popula o objeto global para o modal de zoom usar
+    dadosPagamentosPorLojaGlobal = agrupadoPagamentos;
+
+    htmlPagamentos = Object.keys(agrupadoPagamentos).map(chaveReal => {
+      const item = agrupadoPagamentos[chaveReal];
       let totalGeralValorGrupo = 0;
       let totalGeralQtdGrupo = 0;
 
@@ -382,6 +460,9 @@ function processarDadosBI(dados, dadosPagamentos) {
           </div>
           <div style="display: flex; flex-direction: column; gap: 2px;">
             ${linhasLojasHTML}
+          </div>
+          <div style="margin-top: 8px; text-align: right;">
+            <button type="button" onclick="abrirModalZoom('${chaveReal}')" style="background: #0078d7; color: #fff; border: none; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer;">🔍 Ver Gráfico por Loja</button>
           </div>
         </div>
       `;
@@ -596,8 +677,20 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
             callbacks: {
               label: function(context) {
                 const item = listaPagamentosOrdenada[context.dataIndex];
-                return ` ${context.rotulo}: ${formatarMoedaBR(item.valor)} (${context.raw}% do total)`;
+                return ` ${item.rotulo}: ${formatarMoedaBR(item.valor)} (${context.raw}% do total)`;
               }
+            }
+          }
+        },
+        onClick: (event, elements) => {
+          if (elements && elements.length > 0) {
+            const index = elements[0].index;
+            const rotuloCompleto = labelsPgto[index];
+            // Transforma "PIX (1)" de volta para a chave "PIX|1"
+            const partes = rotuloCompleto.match(/^(.*?)\s*\((.*?)\)$/);
+            if (partes) {
+              const chaveReal = `${partes[1].trim()}|${partes[2].trim()}`;
+              abrirModalZoom(chaveReal);
             }
           }
         }
