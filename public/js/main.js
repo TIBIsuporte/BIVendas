@@ -501,57 +501,55 @@ htmlPagamentos = Object.keys(agrupadoPagamentos).map(chaveReal => {
       let totalGeralValorGrupo = 0;
       let totalGeralQtdGrupo = 0;
 
-      // Calcula os totais primeiro para exibir no cabeçalho compacto
       Object.keys(item.lojas).forEach(idLoja => {
         const dadosLoja = item.lojas[idLoja];
         totalGeralValorGrupo += dadosLoja.vendasValor;
         totalGeralQtdGrupo += dadosLoja.quantidadeVendas;
       });
 
+      // Linhas mais compactas para otimizar o espaço lateral
       let linhasLojasHTML = Object.keys(item.lojas).map(idLoja => {
         const dadosLoja = item.lojas[idLoja];
         return `
-          <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; border-bottom: 1px dashed #eee; font-size: 13px; background: #fff;">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 10px; border-bottom: 1px dashed #eee; font-size: 12px; background: #fff;">
             <span style="font-weight: bold; color: #555;">Loja ${idLoja}</span>
             <span style="color: #333;">${formatarMoedaBR(dadosLoja.vendasValor)}</span>
-            <span style="color: #666; font-size: 12px;">Qtd Vendas: <strong>${dadosLoja.quantidadeVendas}</strong></span>
+            <span style="color: #666; font-size: 11px;">Qtd: <strong>${dadosLoja.quantidadeVendas}</strong></span>
           </div>
         `;
       }).join("");
 
-      // ID único seguro para manipular o elemento no DOM
       const idUnico = 'acordeon_' + chaveReal.replace(/[^a-zA-Z0-9]/g, '_');
 
       return `
-        <div style="margin-bottom: 10px; background: #fafafa; border-radius: 6px; border: 1px solid #e0e0e0; overflow: hidden;">
+        <div style="margin-bottom: 8px; background: #fafafa; border-radius: 6px; border: 1px solid #e0e0e0; overflow: hidden;">
           
-          <!-- CABEÇALHO COMPACTO (CLICÁVEL PARA EXPANDIR/RECOLHER) -->
-          <div onclick="toggleAcordeon('${idUnico}')" style="padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #fdfdfd; user-select: none;">
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <span id="seta_${idUnico}" style="font-size: 14px; font-weight: bold; transition: transform 0.2s; display: inline-block;">▶</span>
-              <span style="font-size: 13px; font-weight: bold; color: #333;">${item.meioPagamento} <span style="color: #666; font-weight: normal;">(${item.nParcelas})</span></span>
+          <!-- CABEÇALHO COMPACTO -->
+          <div onclick="toggleAcordeon('${idUnico}')" style="padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #fdfdfd; user-select: none;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span id="seta_${idUnico}" style="font-size: 12px; font-weight: bold; transition: transform 0.2s; display: inline-block;">▶</span>
+              <span style="font-size: 12px; font-weight: bold; color: #333;">${item.meioPagamento} <span style="color: #666; font-weight: normal; font-size: 11px;">(${item.nParcelas})</span></span>
             </div>
             
-            <div style="display: flex; gap: 20px; align-items: center; font-size: 13px;">
-              <span style="color: #555;">Total Vendas: <strong>${totalGeralQtdGrupo}</strong></span>
+            <div style="display: flex; gap: 12px; align-items: center; font-size: 12px;">
+              <span style="color: #555; font-size: 11px;">Qtd: <strong>${totalGeralQtdGrupo}</strong></span>
               <span style="color: #0078d7; font-weight: bold;">${formatarMoedaBR(totalGeralValorGrupo)}</span>
             </div>
           </div>
 
-          <!-- CONTEÚDO OCULTO (ABAIXO) COM AS LOJAS -->
+          <!-- CONTEÚDO OCULTO (SANFONA) -->
           <div id="${idUnico}" style="display: none; border-top: 1px solid #eee; background: #fff;">
-            <div style="padding: 4px 0;">
+            <div>
               ${linhasLojasHTML}
             </div>
-            <div style="padding: 8px 12px; background: #f9f9f9; text-align: right; border-top: 1px solid #eee;">
-              <button type="button" onclick="abrirModalZoom('${chaveReal}')" style="background: #0078d7; color: #fff; border: none; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer;">🔍 Ver Gráficos por Loja</button>
+            <div style="padding: 6px 10px; background: #f9f9f9; text-align: right; border-top: 1px solid #eee;">
+              <button type="button" onclick="abrirModalZoom('${chaveReal}')" style="background: #0078d7; color: #fff; border: none; padding: 3px 8px; border-radius: 4px; font-size: 10px; cursor: pointer;">🔍 Gráficos</button>
             </div>
           </div>
 
         </div>
       `;
     }).join("");
-
   } else {
     htmlPagamentos = "Nenhum registro de pagamento para a(s) loja(s) selecionada(s).";
   }
