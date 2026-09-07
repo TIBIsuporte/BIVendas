@@ -1,6 +1,6 @@
 /**
  * Módulo Principal de Execução e Regras de Negócio do BI
- * Atualizado com: Sanfona de Pagamentos por Loja e Lojas com Vendedores Ordenados por Melhor Venda.
+ * Atualizado com: Sanfona Corrigida, Formas de Pagamento por Loja e Lojas com Vendedores Ordenados por Melhor Venda.
  */
 
 const SUPABASE_URL = 'https://cwmofpwuihrnifsvqhik.supabase.co';
@@ -17,6 +17,22 @@ let meuGraficoZoomQuantidade = null;
 window.onload = async () => {
   await carregarLojasSupabase();
 };
+
+// --- FUNÇÃO GLOBAL DA SANFONA (ACORDEON) ---
+function toggleAcordeon(idUnico) {
+  const elemento = document.getElementById(idUnico);
+  const seta = document.getElementById('seta_' + idUnico);
+  
+  if (elemento) {
+    if (elemento.style.display === "none" || elemento.style.display === "") {
+      elemento.style.display = "block";
+      if (seta) seta.style.transform = "rotate(90deg)";
+    } else {
+      elemento.style.display = "none";
+      if (seta) seta.style.transform = "rotate(0deg)";
+    }
+  }
+}
 
 // --- FUNÇÃO DE CONTROLE DE ABAS ---
 function mudarAba(aba) {
@@ -536,7 +552,7 @@ function processarDadosBI(dados, dadosPagamentos) {
   document.getElementById("biCardsContainer").style.display = "flex";
   mudarAba('cards');
 
-  // --- PROCESSAMENTO DO RESUMO POR LOJAS COM VENDEDORES DENTRO (ORDENADOS DO MELHOR PARA O PIOR) ---
+  // --- PROCESSAMENTO DO RESUMO POR LOJAS COM VENDEDORES DENTRO ---
   let agrupadoPorLoja = {};
 
   dadosFiltrados.forEach(item => {
@@ -586,7 +602,7 @@ function processarDadosBI(dados, dadosPagamentos) {
   let htmlLojasResumo = lojasOrdenadasResumo.map(loja => {
     let idUnicoLoja = 'acordeon_loja_' + loja.id;
     
-    // Ordena os vendedores dentro da loja do melhor para o pior faturamento líquido (b.liquido - a.liquido)
+    // Ordena os vendedores dentro da loja do melhor para o pior faturamento líquido
     let vendedoresDaLojaOrdenados = Object.values(loja.vendedores).sort((a, b) => b.liquido - a.liquido);
 
     let linhasVendedoresHTML = vendedoresDaLojaOrdenados.map(v => {
@@ -679,7 +695,7 @@ function processarDadosBI(dados, dadosPagamentos) {
   renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrados);
 }
 
-// --- FUNÇÃO PARA RENDERIZAR O DASHBOARD (COM O RANKING RESTAURADO) ---
+// --- FUNÇÃO PARA RENDERIZAR O DASHBOARD ---
 function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrados) {
   
   const listaLojasOrdenadas = Object.keys(totaisPorLoja).map(idLoja => {
