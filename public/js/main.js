@@ -12,7 +12,8 @@ let lojasDisponiveis = [];
 let meuGraficoLojas = null;          // Instância do Chart.js para Lojas
 let meuGraficoPagamentos = null;  // Nova instância do Chart.js para Meios de Pagamento
 let dadosPagamentosPorLojaGlobal = {}; // Armazena a quebra para o zoom
-let meuGraficoZoomPagamento = null;    // Instância do gráfico de zoom
+let meuGraficoZoomPagamento = null;    // Instância do gráfico de zoom (Valores)
+let meuGraficoZoomQuantidade = null;   // Instância do gráfico de zoom (Quantidades)
 
 window.onload = async () => {
   await carregarLojasSupabase();
@@ -134,7 +135,7 @@ function confirmarSelecaoLojas() {
 }
 // ---------------------------------
 
-// --- FUNÇÕES DO MODAL DE ZOOM DE PAGAMENTO ---
+// --- FUNÇÕES DO MODAL DE ZOOM DE PAGAMENTO (VALORES + QUANTIDADES + DESTAQUE) ---
 function abrirModalZoom(rotuloChave) {
   const dadosDoGrupo = dadosPagamentosPorLojaGlobal[rotuloChave];
   if (!dadosDoGrupo) return;
@@ -144,25 +145,51 @@ function abrirModalZoom(rotuloChave) {
     tituloEl.innerText = `Detalhes por Loja — ${rotuloChave}`;
   }
 
+  // --- LÓGICA DE DESTAQUE (QUEM VENDEU MAIS) ---
+  let melhorLojaValor = { id: '', valor: -1 };
+  let melhorLojaQtd = { id: '', qtd: -1 };
+
+  Object.keys(dadosDoGrupo.lojas).forEach(idLoja => {
+    const d = dadosDoGrupo.lojas[idLoja];
+    if (d.vendasValor > melhorLojaValor.valor) {
+      melhorLojaValor = { id: idLoja, valor: d.vendasValor };
+    }
+    if (d.quantidadeVendas > melhorLojaQtd.qtd) {
+      melhorLojaQtd = { id: idLoja, qtd: d.quantidadeVendas };
+    }
+  });
+
+  const destaqueEl = document.getElementById("destaqueCampeaoModal");
+  if (destaqueEl) {
+    destaqueEl.innerHTML = `
+      🏆 <strong>Destaque na Forma de Pagamento:</strong><br>
+      • Maior Faturamento: <strong style="color: #0056b3;">Loja ${melhorLojaValor.id}</strong> com <strong>${formatarMoedaBR(melhorLojaValor.valor)}</strong><br>
+      • Maior Volume de Vendas: <strong style="color: #0056b3;">Loja ${melhorLojaQtd.id}</strong> com <strong>${melhorLojaQtd.qtd} vendas</strong>
+    `;
+  }
+  // --------------------------------------------
+
   const modal = document.getElementById("modalZoomPagamento");
   if (modal) modal.style.display = "flex";
 
-  const ctxZoom = document.getElementById("graficoZoomPagamentoLoja");
-  if (ctxZoom) {
-    const lojasIds = Object.keys(dadosDoGrupo.lojas);
-    const valoresLojas = lojasIds.map(id => dadosDoGrupo.lojas[id].vendasValor);
-    const labelsLojas = lojasIds.map(id => `Loja ${id}`);
+  const lojasIds = Object.keys(dadosDoGrupo.lojas);
+  const labelsLojas = lojasIds.map(id => `Loja ${id}`);
+  const valoresLojas = lojasIds.map(id => dadosDoGrupo.lojas[id].vendasValor);
+  const qtdLojas = lojasIds.map(id => dadosDoGrupo.lojas[id].quantidadeVendas);
 
-    if (meuGraficoZoomPagamento) {
-      meuGraficoZoomPagamento.destroy();
-    }
+  // Destrói gráficos anteriores para evitar sobreposição
+  if (meuGraficoZoomPagamento) meuGraficoZoomPagamento.destroy();
+  if (meuGraficoZoomQuantidade) meuGraficoZoomQuantidade.destroy();
 
-    meuGraficoZoomPagamento = new Chart(ctxZoom, {
+  // 1. Renderiza Gráfico de Valores (Em cima)
+  const ctxZoomValores = document.getElementById("graficoZoomPagamentoLoja");
+  if (ctxZoomValores) {
+    meuGraficoZoomPagamento = new Chart(ctxZoomValores, {
       type: 'bar',
       data: {
         labels: labelsLojas,
         datasets: [{
-          label: 'Valor de Vendas (R$)',
+          label: 'Valor (R$)',
           data: valoresLojas,
           backgroundColor: '#0078d7',
           borderWidth: 1
@@ -188,6 +215,45 @@ function abrirModalZoom(rotuloChave) {
               callback: function(value) {
                 return 'R$ ' + value.toLocaleString('pt-BR');
               }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // 2. Renderiza Gráfico de Quantidades (Embaixo)
+  const ctxZoomQtd = document.getElementById("graficoZoomQuantidadeLoja");
+  if (ctxZoomQtd) {
+    meuGraficoZoomQuantidade = new Chart(ctxZoomQtd, {
+      type: 'bar',
+      data: {
+        labels: labelsLojas,
+        datasets: [{
+          label: 'Quantidade de Vendas',
+          data: qtdLojas,
+          backgroundColor: '#5cb85c',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                return ` Qtd Vendas: ${context.raw}`;
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              precision: 0 // Garante apenas números inteiros no eixo Y de quantidade
             }
           }
         }
@@ -401,7 +467,6 @@ function processarDadosBI(dados, dadosPagamentos) {
     pagamentosFiltrados.forEach(pgto => {
       const meio = (pgto.MEIO_PAGAMENTO || pgto.MEIOPAGAMENTO || "NÃO ESPECIFICADO").trim();
       const parcelas = (pgto.N_PARCELAS || "1").trim();
-      const chave = `${meio} (${parcelas})*`; // Mantém compatibilidade com a chave do gráfico
 
       const textoLojaPgto = String(pgto.LOJA || pgto.CODIGOLOJA || "Geral").trim();
       const matchLojaPgto = textoLojaPgto.match(/^0*(\d+)/);
@@ -462,7 +527,7 @@ function processarDadosBI(dados, dadosPagamentos) {
             ${linhasLojasHTML}
           </div>
           <div style="margin-top: 8px; text-align: right;">
-            <button type="button" onclick="abrirModalZoom('${chaveReal}')" style="background: #0078d7; color: #fff; border: none; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer;">🔍 Ver Gráfico por Loja</button>
+            <button type="button" onclick="abrirModalZoom('${chaveReal}')" style="background: #0078d7; color: #fff; border: none; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer;">🔍 Ver Gráficos por Loja</button>
           </div>
         </div>
       `;
@@ -489,7 +554,6 @@ function processarDadosBI(dados, dadosPagamentos) {
 
   document.getElementById("cardResumoPagamento").innerHTML = htmlPagamentos;
   
-  // Exibe os botões de abas e os containers
   document.getElementById("biTabsHeader").style.display = "flex";
   document.getElementById("biCardsContainer").style.display = "flex";
   mudarAba('cards');
@@ -536,14 +600,12 @@ function processarDadosBI(dados, dadosPagamentos) {
     }
   }
 
-  // --- RENDERIZAÇÃO DO DASHBOARD (GRÁFICO + RANKINGS) ---
   renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrados);
 }
 
 // --- FUNÇÃO PARA RENDERIZAR O DASHBOARD ---
 function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrados) {
   
-  // 1. Processa e ordena as lojas da maior participação/líquido para a menor
   const listaLojasOrdenadas = Object.keys(totaisPorLoja).map(idLoja => {
     const t = totaisPorLoja[idLoja];
     const taxaDesconto = t.bruto > 0 ? (t.desconto / t.bruto) * 100 : 0;
@@ -560,7 +622,6 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
 
   listaLojasOrdenadas.sort((a, b) => b.liquido - a.liquido);
 
-  // 2. Atualiza o título do gráfico de lojas no HTML para exibir o valor total líquido ao lado
   const canvasGrafico = document.getElementById('graficoParticipacaoLojas');
   if (canvasGrafico) {
     const cardPai = canvasGrafico.closest('.card, div');
@@ -572,7 +633,6 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
     }
   }
 
-  // 3. Renderiza o Gráfico de Rosca de Lojas
   const ctx = document.getElementById('graficoParticipacaoLojas');
   if (ctx) {
     const labels = listaLojasOrdenadas.map(item => `Loja ${item.idLoja}`);
@@ -582,9 +642,7 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
       '#17a2b8', '#e83e8c', '#fd7e14', '#20c997', '#6610f2'
     ];
 
-    if (meuGraficoLojas) {
-      meuGraficoLojas.destroy();
-    }
+    if (meuGraficoLojas) meuGraficoLojas.destroy();
 
     meuGraficoLojas = new Chart(ctx, {
       type: 'doughnut',
@@ -615,7 +673,6 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
     });
   }
 
-  // 4. Renderiza o Gráfico de Rosca de Meios de Pagamento (Agrupado por Meio + Parcelas)
   const containerPagamentosGrafico = document.getElementById('graficoParticipacaoPagamentos');
   if (containerPagamentosGrafico && Array.isArray(pagamentosFiltrados) && pagamentosFiltrados.length > 0) {
     
@@ -640,7 +697,6 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
 
     listaPagamentosOrdenada.sort((a, b) => b.valor - a.valor);
 
-    // Atualiza o título do card do gráfico de pagamentos usando o ID direto
     const headerPgtoEl = document.getElementById('tituloGraficoPagamentos');
     if (headerPgtoEl) {
       headerPgtoEl.innerHTML = `Participação por Meio de Pagamento (%) — <span style="color: #0078d7; font-weight: bold;">${formatarMoedaBR(valorTotalGeralPgto)}</span>`;
@@ -653,9 +709,7 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
       '#17a2b8', '#e83e8c', '#fd7e14', '#20c997', '#6610f2'
     ];
 
-    if (meuGraficoPagamentos) {
-      meuGraficoPagamentos.destroy();
-    }
+    if (meuGraficoPagamentos) meuGraficoPagamentos.destroy();
 
     meuGraficoPagamentos = new Chart(containerPagamentosGrafico, {
       type: 'doughnut',
@@ -686,7 +740,6 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
           if (elements && elements.length > 0) {
             const index = elements[0].index;
             const rotuloCompleto = labelsPgto[index];
-            // Transforma "PIX (1)" de volta para a chave "PIX|1"
             const partes = rotuloCompleto.match(/^(.*?)\s*\((.*?)\)$/);
             if (partes) {
               const chaveReal = `${partes[1].trim()}|${partes[2].trim()}`;
@@ -698,7 +751,6 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
     });
   }
 
-  // 5. Renderiza o Ranking de Descontos Proporcionais (Menor taxa = 1º lugar)
   const containerRankingDescontos = document.getElementById('rankingDescontosContainer');
   if (containerRankingDescontos) {
     const listaRankingDesconto = [...listaLojasOrdenadas].sort((a, b) => a.taxaDesconto - b.taxaDesconto);
