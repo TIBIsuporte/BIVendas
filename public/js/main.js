@@ -1,7 +1,6 @@
 /**
  * Módulo Principal de Execução e Regras de Negócio do BI
- * Gerencia o carregamento de lojas, o envio de requisições paralelas para as APIs
- * e a renderização completa do Dashboard gerencial e abas.
+ * Atualizado com: Zoom de Pagamentos, Lojas -> Vendedores ordenados, e Ranking de Descontos Restaurado.
  */
 
 const SUPABASE_URL = 'https://cwmofpwuihrnifsvqhik.supabase.co';
@@ -9,11 +8,11 @@ const SUPABASE_KEY = 'sb_publishable_biWjIRo9x6maeZXcoKX6Lw_l-fjV0wP';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let lojasDisponiveis = [];
-let meuGraficoLojas = null;             // Instância do Chart.js para Lojas
-let meuGraficoPagamentos = null;  // Nova instância do Chart.js para Meios de Pagamento
-let dadosPagamentosPorLojaGlobal = {}; // Armazena a quebra para o zoom
-let meuGraficoZoomPagamento = null;    // Instância do gráfico de zoom (Valores)
-let meuGraficoZoomQuantidade = null;   // Instância do gráfico de zoom (Quantidades)
+let meuGraficoLojas = null;             
+let meuGraficoPagamentos = null;  
+let dadosPagamentosPorLojaGlobal = {}; 
+let meuGraficoZoomPagamento = null;    
+let meuGraficoZoomQuantidade = null;   
 
 window.onload = async () => {
   await carregarLojasSupabase();
@@ -29,7 +28,6 @@ function mudarAba(aba) {
   const conteudoDashboard = document.getElementById("conteudoAbaDashboard");
   const conteudoDetalhes = document.getElementById("conteudoAbaDetalhes");
 
-  // Oculta todos e reseta cores
   conteudoCards.style.display = "none";
   conteudoDashboard.style.display = "none";
   if (conteudoDetalhes) conteudoDetalhes.style.display = "none";
@@ -135,7 +133,7 @@ function confirmarSelecaoLojas() {
 }
 // ---------------------------------
 
-// --- FUNÇÕES DO MODAL DE ZOOM DE PAGAMENTO (VALORES + QUANTIDADES + DESTAQUE) ---
+// --- FUNÇÕES DO MODAL DE ZOOM DE PAGAMENTO ---
 function abrirModalZoom(rotuloChave) {
   const dadosDoGrupo = dadosPagamentosPorLojaGlobal[rotuloChave];
   if (!dadosDoGrupo) return;
@@ -145,7 +143,6 @@ function abrirModalZoom(rotuloChave) {
     tituloEl.innerText = `Detalhes por Loja — ${rotuloChave}`;
   }
 
-  // --- LÓGICA DE DESTAQUE (QUEM VENDEU MAIS) ---
   let melhorLojaValor = { id: '', valor: -1 };
   let melhorLojaQtd = { id: '', qtd: -1 };
 
@@ -167,7 +164,6 @@ function abrirModalZoom(rotuloChave) {
       • Maior Volume de Vendas: <strong style="color: #0056b3;">Loja ${melhorLojaQtd.id}</strong> com <strong>${melhorLojaQtd.qtd} vendas</strong>
     `;
   }
-  // --------------------------------------------
 
   const modal = document.getElementById("modalZoomPagamento");
   if (modal) modal.style.display = "flex";
@@ -177,23 +173,16 @@ function abrirModalZoom(rotuloChave) {
   const valoresLojas = lojasIds.map(id => dadosDoGrupo.lojas[id].vendasValor);
   const qtdLojas = lojasIds.map(id => dadosDoGrupo.lojas[id].quantidadeVendas);
 
-  // Destrói gráficos anteriores para evitar sobreposição
   if (meuGraficoZoomPagamento) meuGraficoZoomPagamento.destroy();
   if (meuGraficoZoomQuantidade) meuGraficoZoomQuantidade.destroy();
 
-  // 1. Renderiza Gráfico de Valores (Em cima)
   const ctxZoomValores = document.getElementById("graficoZoomPagamentoLoja");
   if (ctxZoomValores) {
     meuGraficoZoomPagamento = new Chart(ctxZoomValores, {
       type: 'bar',
       data: {
         labels: labelsLojas,
-        datasets: [{
-          label: 'Valor (R$)',
-          data: valoresLojas,
-          backgroundColor: '#0078d7',
-          borderWidth: 1
-        }]
+        datasets: [{ label: 'Valor (R$)', data: valoresLojas, backgroundColor: '#0078d7', borderWidth: 1 }]
       },
       options: {
         responsive: true,
@@ -201,40 +190,26 @@ function abrirModalZoom(rotuloChave) {
         plugins: {
           legend: { display: false },
           tooltip: {
-            callbacks: {
-              label: function(context) {
-                return ` Valor: ${formatarMoedaBR(context.raw)}`;
-              }
-            }
+            callbacks: { label: function(context) { return ` Valor: ${formatarMoedaBR(context.raw)}`; } }
           }
         },
         scales: {
           y: {
             beginAtZero: true,
-            ticks: {
-              callback: function(value) {
-                return 'R$ ' + value.toLocaleString('pt-BR');
-              }
-            }
+            ticks: { callback: function(value) { return 'R$ ' + value.toLocaleString('pt-BR'); } }
           }
         }
       }
     });
   }
 
-  // 2. Renderiza Gráfico de Quantidades (Embaixo)
   const ctxZoomQtd = document.getElementById("graficoZoomQuantidadeLoja");
   if (ctxZoomQtd) {
     meuGraficoZoomQuantidade = new Chart(ctxZoomQtd, {
       type: 'bar',
       data: {
         labels: labelsLojas,
-        datasets: [{
-          label: 'Quantidade de Vendas',
-          data: qtdLojas,
-          backgroundColor: '#5cb85c',
-          borderWidth: 1
-        }]
+        datasets: [{ label: 'Quantidade de Vendas', data: qtdLojas, backgroundColor: '#5cb85c', borderWidth: 1 }]
       },
       options: {
         responsive: true,
@@ -242,20 +217,11 @@ function abrirModalZoom(rotuloChave) {
         plugins: {
           legend: { display: false },
           tooltip: {
-            callbacks: {
-              label: function(context) {
-                return ` Qtd Vendas: ${context.raw}`;
-              }
-            }
+            callbacks: { label: function(context) { return ` Qtd Vendas: ${context.raw}`; } }
           }
         },
         scales: {
-          y: {
-            beginAtZero: true,
-            ticks: {
-              precision: 0
-            }
-          }
+          y: { beginAtZero: true, ticks: { precision: 0 } }
         }
       }
     });
@@ -417,11 +383,13 @@ function processarDadosBI(dados, dadosPagamentos) {
   });
 
   let htmlBrutoPorLoja = "";
-  let htmlDescontoPorLoja = "";
   let htmlLiquidoPorLoja = "";
   let htmlQtdeVendasPorLoja = "";
   let htmlTicketMedioPorLoja = "";
   let totalGeralVendasOS = 0;
+
+  // Array estruturado para montar o RANKING DE DESCONTOS ordenado do maior para o menor percentual ou valor
+  let rankingDescontosArray = [];
 
   Object.keys(totaisPorLoja).forEach(id => {
     const t = totaisPorLoja[id];
@@ -429,13 +397,32 @@ function processarDadosBI(dados, dadosPagamentos) {
     totalGeralVendasOS += qtdVendasLoja;
 
     const ticketMedioLoja = qtdVendasLoja > 0 ? (t.liquido / qtdVendasLoja) : 0;
+    const percDescontoLoja = t.bruto > 0 ? (t.desconto / t.bruto) * 100 : 0;
+
+    rankingDescontosArray.push({
+      idLoja: id,
+      desconto: t.desconto,
+      bruto: t.bruto,
+      percentual: percDescontoLoja
+    });
 
     htmlBrutoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 12px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.bruto)}</span></div>`;
-    htmlDescontoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 12px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.desconto)}</span></div>`;
     htmlLiquidoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 12px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.liquido)}</span></div>`;
     htmlQtdeVendasPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 12px;"><span><strong>${id}</strong></span> <span>${qtdVendasLoja}</span></div>`;
     htmlTicketMedioPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 12px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(ticketMedioLoja)}</span></div>`;
   });
+
+  // Ordena o ranking de descontos do maior percentual de desconto para o menor
+  rankingDescontosArray.sort((a, b) => b.percentual - a.percentual);
+
+  let htmlDescontoPorLoja = rankingDescontosArray.map(item => {
+    return `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 12px; border-bottom: 1px dashed #eee; padding-bottom: 2px;">
+        <span><strong>Loja ${item.idLoja}</strong> <span style="color: #d9534f; font-size: 10px;">(${item.percentual.toFixed(1)}%)</span></span> 
+        <span style="font-weight: bold; color: #d9534f;">${formatarMoedaBR(item.desconto)}</span>
+      </div>
+    `;
+  }).join("");
 
   const ticketMedioGeral = totalGeralVendasOS > 0 ? (totalLiquidoGeral / totalGeralVendasOS) : 0;
 
@@ -531,15 +518,14 @@ function processarDadosBI(dados, dadosPagamentos) {
             <div style="display: flex; gap: 12px; align-items: center; font-size: 12px;">
               <span style="color: #555; font-size: 11px;">Qtd: <strong>${totalGeralQtdGrupo}</strong></span>
               <span style="color: #0078d7; font-weight: bold;">${formatarMoedaBR(totalGeralValorGrupo)}</span>
+              <!-- BOTÃO DE ZOOM -->
+              <button type="button" onclick="event.stopPropagation(); abrirModalZoom('${chaveReal}')" style="background: #0078d7; color: #fff; border: none; padding: 3px 6px; border-radius: 4px; font-size: 10px; cursor: pointer;" title="Ver Detalhes por Loja">🔍</button>
             </div>
           </div>
 
           <div id="${idUnico}" style="display: none; border-top: 1px solid #eee; background: #fff;">
             <div>
               ${linhasLojasHTML}
-            </div>
-            <div style="padding: 6px 10px; background: #f9f9f9; text-align: right; border-top: 1px solid #eee;">
-              <button type="button" onclick="abrirModalZoom('${chaveReal}')" style="background: #0078d7; color: #fff; border: none; padding: 3px 8px; border-radius: 4px; font-size: 10px; cursor: pointer;">🔍 Gráficos</button>
             </div>
           </div>
 
@@ -552,7 +538,7 @@ function processarDadosBI(dados, dadosPagamentos) {
   
   // Atualiza os cards no HTML
   document.getElementById("cardValorBruto").innerHTML = `${htmlBrutoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 15px; font-weight: bold;">${formatarMoedaBR(totalBrutoGeral)}</div>`;
-  document.getElementById("cardDesconto").innerHTML = `${htmlDescontoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 15px; font-weight: bold;">${formatarMoedaBR(totalDescontoGeral)}</div>`;
+  document.getElementById("cardDesconto").innerHTML = `${htmlDescontoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 15px; font-weight: bold; color: #d9534f;">${formatarMoedaBR(totalDescontoGeral)}</div>`;
   document.getElementById("cardValorLiquido").innerHTML = `${htmlLiquidoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 15px; font-weight: bold;">${formatarMoedaBR(totalLiquidoGeral)}</div>`;
   
   const cardQtdeVendasEl = document.getElementById("cardQtdeVendas");
@@ -571,26 +557,30 @@ function processarDadosBI(dados, dadosPagamentos) {
   document.getElementById("biCardsContainer").style.display = "flex";
   mudarAba('cards');
 
-  // --- PROCESSAMENTO DO RESUMO POR VENDEDORES (COM ORDENAÇÃO DE MAIOR PARA MENOR) ---
-  let agrupadoVendedores = {};
+  // --- PROCESSAMENTO DO RESUMO POR LOJAS (VENDEDORES DENTRO, ORDENADOS) ---
+  let agrupadoPorLoja = {};
 
   dadosFiltrados.forEach(item => {
-    let nomeVendedor = item.VENDEDOR ? item.VENDEDOR.trim() : "NÃO INFORMADO";
     let textoLoja = String(item.LOJANOME ?? item.CODIGOLOJA ?? item.LOJA ?? "Geral").trim();
     let matchLoja = textoLoja.match(/^0*(\d+)/);
     let idLoja = matchLoja ? matchLoja[1] : textoLoja;
+    let nomeLojaCompleta = item.LOJANOME || `Loja ${idLoja}`;
 
-    if (!agrupadoVendedores[nomeVendedor]) {
-      agrupadoVendedores[nomeVendedor] = {
-        nome: nomeVendedor,
+    let nomeVendedor = item.VENDEDOR ? item.VENDEDOR.trim() : "NÃO INFORMADO";
+
+    if (!agrupadoPorLoja[idLoja]) {
+      agrupadoPorLoja[idLoja] = {
+        id: idLoja,
+        nome: nomeLojaCompleta,
         totalValorLiquido: 0,
         totalQtd: 0,
-        lojas: {}
+        vendedores: {}
       };
     }
 
-    if (!agrupadoVendedores[nomeVendedor].lojas[idLoja]) {
-      agrupadoVendedores[nomeVendedor].lojas[idLoja] = {
+    if (!agrupadoPorLoja[idLoja].vendedores[nomeVendedor]) {
+      agrupadoPorLoja[idLoja].vendedores[nomeVendedor] = {
+        nome: nomeVendedor,
         bruto: 0,
         desconto: 0,
         liquido: 0,
@@ -602,34 +592,28 @@ function processarDadosBI(dados, dadosPagamentos) {
     let desconto = parseNumeroBR(item.DESCPRODUTO);
     let liquido = parseNumeroBR(item.LIQUIDOPRODUTO);
 
-    agrupadoVendedores[nomeVendedor].lojas[idLoja].bruto += bruto;
-    agrupadoVendedores[nomeVendedor].lojas[idLoja].desconto += desconto;
-    agrupadoVendedores[nomeVendedor].lojas[idLoja].liquido += liquido;
-    agrupadoVendedores[nomeVendedor].lojas[idLoja].quantidade += 1;
+    agrupadoPorLoja[idLoja].vendedores[nomeVendedor].bruto += bruto;
+    agrupadoPorLoja[idLoja].vendedores[nomeVendedor].desconto += desconto;
+    agrupadoPorLoja[idLoja].vendedores[nomeVendedor].liquido += liquido;
+    agrupadoPorLoja[idLoja].vendedores[nomeVendedor].quantidade += 1;
 
-    agrupadoVendedores[nomeVendedor].totalValorLiquido += liquido;
-    agrupadoVendedores[nomeVendedor].totalQtd += 1;
+    agrupadoPorLoja[idLoja].totalValorLiquido += liquido;
+    agrupadoPorLoja[idLoja].totalQtd += 1;
   });
 
-  // Ordena os Vendedores do MAIOR para o MENOR valor líquido total
-  let vendedoresOrdenados = Object.values(agrupadoVendedores).sort((a, b) => b.totalValorLiquido - a.totalValorLiquido);
+  let lojasOrdenadasResumo = Object.values(agrupadoPorLoja).sort((a, b) => b.totalValorLiquido - a.totalValorLiquido);
 
-  let htmlVendedores = vendedoresOrdenados.map(vendedor => {
-    let idUnicoVend = 'acordeon_vend_' + vendedor.nome.replace(/[^a-zA-Z0-9]/g, '_');
+  let htmlLojasResumo = lojasOrdenadasResumo.map(loja => {
+    let idUnicoLoja = 'acordeon_loja_' + loja.id;
+    let vendedoresDaLojaOrdenados = Object.values(loja.vendedores).sort((a, b) => b.liquido - a.liquido);
 
-    // Ordena as lojas de cada vendedor também por valor líquido (maior para menor)
-    let lojasOrdenadas = Object.keys(vendedor.lojas).sort((a, b) => {
-      return vendedor.lojas[b].liquido - vendedor.lojas[a].liquido;
-    });
-
-    let linhasLojasVendHTML = lojasOrdenadas.map(idLoja => {
-      let dLoja = vendedor.lojas[idLoja];
+    let linhasVendedoresHTML = vendedoresDaLojaOrdenados.map(v => {
       return `
-        <div style="padding: 6px 10px; border-bottom: 1px dashed #eee; font-size: 11px; background: #fff; display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; align-items: center; text-align: right;">
-          <span style="font-weight: bold; color: #555; text-align: left;">Loja ${idLoja}</span>
-          <span style="color: #666;" title="Bruto">B: ${formatarMoedaBR(dLoja.bruto)}</span>
-          <span style="color: #d9534f;" title="Desconto">D: ${formatarMoedaBR(dLoja.desconto)}</span>
-          <span style="color: #28a745; font-weight: bold;" title="Líquido">L: ${formatarMoedaBR(dLoja.liquido)}</span>
+        <div style="padding: 6px 10px; border-bottom: 1px dashed #eee; font-size: 11px; background: #fff; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; align-items: center; text-align: right;">
+          <span style="font-weight: bold; color: #555; text-align: left;">👤 ${v.nome}</span>
+          <span style="color: #666;" title="Bruto">B: ${formatarMoedaBR(v.bruto)}</span>
+          <span style="color: #d9534f;" title="Desconto">D: ${formatarMoedaBR(v.desconto)}</span>
+          <span style="color: #28a745; font-weight: bold;" title="Líquido">L: ${formatarMoedaBR(v.liquido)}</span>
         </div>
       `;
     }).join("");
@@ -637,26 +621,26 @@ function processarDadosBI(dados, dadosPagamentos) {
     return `
       <div style="margin-bottom: 8px; background: #fafafa; border-radius: 6px; border: 1px solid #e0e0e0; overflow: hidden;">
         
-        <div onclick="toggleAcordeon('${idUnicoVend}')" style="padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #fdfdfd; user-select: none;">
+        <div onclick="toggleAcordeon('${idUnicoLoja}')" style="padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #fdfdfd; user-select: none;">
           <div style="display: flex; align-items: center; gap: 8px;">
-            <span id="seta_${idUnicoVend}" style="font-size: 12px; font-weight: bold; transition: transform 0.2s; display: inline-block;">▶</span>
-            <span style="font-size: 12px; font-weight: bold; color: #333;">${vendedor.nome}</span>
+            <span id="seta_${idUnicoLoja}" style="font-size: 12px; font-weight: bold; transition: transform 0.2s; display: inline-block;">▶</span>
+            <span style="font-size: 12px; font-weight: bold; color: #333;">🏪 ${loja.nome}</span>
           </div>
           
           <div style="display: flex; gap: 12px; align-items: center; font-size: 12px;">
-            <span style="color: #555; font-size: 11px;">Qtd: <strong>${vendedor.totalQtd}</strong></span>
-            <span style="color: #0078d7; font-weight: bold;">${formatarMoedaBR(vendedor.totalValorLiquido)}</span>
+            <span style="color: #555; font-size: 11px;">Qtd: <strong>${loja.totalQtd}</strong></span>
+            <span style="color: #0078d7; font-weight: bold;">${formatarMoedaBR(loja.totalValorLiquido)}</span>
           </div>
         </div>
 
-        <div id="${idUnicoVend}" style="display: none; border-top: 1px solid #eee; background: #fff;">
-          <div style="padding: 2px 6px; background: #f1f3f5; font-size: 10px; font-weight: bold; color: #555; display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; text-align: right;">
-            <span style="text-align: left;">Loja</span>
+        <div id="${idUnicoLoja}" style="display: none; border-top: 1px solid #eee; background: #fff;">
+          <div style="padding: 2px 6px; background: #f1f3f5; font-size: 10px; font-weight: bold; color: #555; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; text-align: right;">
+            <span style="text-align: left;">Vendedor</span>
             <span>Bruto</span>
             <span>Desconto</span>
             <span>Líquido</span>
           </div>
-          ${linhasLojasVendHTML}
+          ${linhasVendedoresHTML}
         </div>
 
       </div>
@@ -665,7 +649,7 @@ function processarDadosBI(dados, dadosPagamentos) {
 
   const cardResumoVendedoresEl = document.getElementById("cardResumoVendedores");
   if (cardResumoVendedoresEl) {
-    cardResumoVendedoresEl.innerHTML = htmlVendedores || '<div style="padding: 10px; text-align: center; color: #666; font-size: 12px;">Nenhum vendedor encontrado.</div>';
+    cardResumoVendedoresEl.innerHTML = htmlLojasResumo || '<div style="padding: 10px; text-align: center; color: #666; font-size: 12px;">Nenhum registro encontrado.</div>';
   }
 
   // --- POPULAR TABELA DA ABA 3 (DETALHES / AUDITORIA) ---
