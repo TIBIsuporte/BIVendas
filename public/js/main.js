@@ -9,7 +9,7 @@ const SUPABASE_KEY = 'sb_publishable_biWjIRo9x6maeZXcoKX6Lw_l-fjV0wP';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let lojasDisponiveis = [];
-let meuGraficoLojas = null;          // Instância do Chart.js para Lojas
+let meuGraficoLojas = null;             // Instância do Chart.js para Lojas
 let meuGraficoPagamentos = null;  // Nova instância do Chart.js para Meios de Pagamento
 let dadosPagamentosPorLojaGlobal = {}; // Armazena a quebra para o zoom
 let meuGraficoZoomPagamento = null;    // Instância do gráfico de zoom (Valores)
@@ -253,7 +253,7 @@ function abrirModalZoom(rotuloChave) {
           y: {
             beginAtZero: true,
             ticks: {
-              precision: 0 // Garante apenas números inteiros no eixo Y de quantidade
+              precision: 0
             }
           }
         }
@@ -441,7 +441,7 @@ function processarDadosBI(dados, dadosPagamentos) {
 
   // --- PROCESSAMENTO DA API DE PAGAMENTOS ---
   let pagamentosFiltrados = [];
-  dadosPagamentosPorLojaGlobal = {}; // Reseta o cache global do zoom
+  dadosPagamentosPorLojaGlobal = {};
 
   if (Array.isArray(dadosPagamentos) && dadosPagamentos.length > 0) {
     pagamentosFiltrados = dadosPagamentos;
@@ -493,10 +493,9 @@ function processarDadosBI(dados, dadosPagamentos) {
       agrupadoPagamentos[chaveReal].lojas[idLoja].vendasValor += valorTotalPgto;
     });
 
-    // Popula o objeto global para o modal de zoom usar
     dadosPagamentosPorLojaGlobal = agrupadoPagamentos;
 
-htmlPagamentos = Object.keys(agrupadoPagamentos).map(chaveReal => {
+    htmlPagamentos = Object.keys(agrupadoPagamentos).map(chaveReal => {
       const item = agrupadoPagamentos[chaveReal];
       let totalGeralValorGrupo = 0;
       let totalGeralQtdGrupo = 0;
@@ -507,7 +506,6 @@ htmlPagamentos = Object.keys(agrupadoPagamentos).map(chaveReal => {
         totalGeralQtdGrupo += dadosLoja.quantidadeVendas;
       });
 
-      // Linhas mais compactas para otimizar o espaço lateral
       let linhasLojasHTML = Object.keys(item.lojas).map(idLoja => {
         const dadosLoja = item.lojas[idLoja];
         return `
@@ -524,7 +522,6 @@ htmlPagamentos = Object.keys(agrupadoPagamentos).map(chaveReal => {
       return `
         <div style="margin-bottom: 8px; background: #fafafa; border-radius: 6px; border: 1px solid #e0e0e0; overflow: hidden;">
           
-          <!-- CABEÇALHO COMPACTO -->
           <div onclick="toggleAcordeon('${idUnico}')" style="padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #fdfdfd; user-select: none;">
             <div style="display: flex; align-items: center; gap: 8px;">
               <span id="seta_${idUnico}" style="font-size: 12px; font-weight: bold; transition: transform 0.2s; display: inline-block;">▶</span>
@@ -537,7 +534,6 @@ htmlPagamentos = Object.keys(agrupadoPagamentos).map(chaveReal => {
             </div>
           </div>
 
-          <!-- CONTEÚDO OCULTO (SANFONA) -->
           <div id="${idUnico}" style="display: none; border-top: 1px solid #eee; background: #fff;">
             <div>
               ${linhasLojasHTML}
@@ -574,6 +570,103 @@ htmlPagamentos = Object.keys(agrupadoPagamentos).map(chaveReal => {
   document.getElementById("biTabsHeader").style.display = "flex";
   document.getElementById("biCardsContainer").style.display = "flex";
   mudarAba('cards');
+
+  // --- PROCESSAMENTO DO RESUMO POR VENDEDORES (COM ORDENAÇÃO DE MAIOR PARA MENOR) ---
+  let agrupadoVendedores = {};
+
+  dadosFiltrados.forEach(item => {
+    let nomeVendedor = item.VENDEDOR ? item.VENDEDOR.trim() : "NÃO INFORMADO";
+    let textoLoja = String(item.LOJANOME ?? item.CODIGOLOJA ?? item.LOJA ?? "Geral").trim();
+    let matchLoja = textoLoja.match(/^0*(\d+)/);
+    let idLoja = matchLoja ? matchLoja[1] : textoLoja;
+
+    if (!agrupadoVendedores[nomeVendedor]) {
+      agrupadoVendedores[nomeVendedor] = {
+        nome: nomeVendedor,
+        totalValorLiquido: 0,
+        totalQtd: 0,
+        lojas: {}
+      };
+    }
+
+    if (!agrupadoVendedores[nomeVendedor].lojas[idLoja]) {
+      agrupadoVendedores[nomeVendedor].lojas[idLoja] = {
+        bruto: 0,
+        desconto: 0,
+        liquido: 0,
+        quantidade: 0
+      };
+    }
+
+    let bruto = parseNumeroBR(item.VALORBRUTOPRODUTO);
+    let desconto = parseNumeroBR(item.DESCPRODUTO);
+    let liquido = parseNumeroBR(item.LIQUIDOPRODUTO);
+
+    agrupadoVendedores[nomeVendedor].lojas[idLoja].bruto += bruto;
+    agrupadoVendedores[nomeVendedor].lojas[idLoja].desconto += desconto;
+    agrupadoVendedores[nomeVendedor].lojas[idLoja].liquido += liquido;
+    agrupadoVendedores[nomeVendedor].lojas[idLoja].quantidade += 1;
+
+    agrupadoVendedores[nomeVendedor].totalValorLiquido += liquido;
+    agrupadoVendedores[nomeVendedor].totalQtd += 1;
+  });
+
+  // Ordena os Vendedores do MAIOR para o MENOR valor líquido total
+  let vendedoresOrdenados = Object.values(agrupadoVendedores).sort((a, b) => b.totalValorLiquido - a.totalValorLiquido);
+
+  let htmlVendedores = vendedoresOrdenados.map(vendedor => {
+    let idUnicoVend = 'acordeon_vend_' + vendedor.nome.replace(/[^a-zA-Z0-9]/g, '_');
+
+    // Ordena as lojas de cada vendedor também por valor líquido (maior para menor)
+    let lojasOrdenadas = Object.keys(vendedor.lojas).sort((a, b) => {
+      return vendedor.lojas[b].liquido - vendedor.lojas[a].liquido;
+    });
+
+    let linhasLojasVendHTML = lojasOrdenadas.map(idLoja => {
+      let dLoja = vendedor.lojas[idLoja];
+      return `
+        <div style="padding: 6px 10px; border-bottom: 1px dashed #eee; font-size: 11px; background: #fff; display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; align-items: center; text-align: right;">
+          <span style="font-weight: bold; color: #555; text-align: left;">Loja ${idLoja}</span>
+          <span style="color: #666;" title="Bruto">B: ${formatarMoedaBR(dLoja.bruto)}</span>
+          <span style="color: #d9534f;" title="Desconto">D: ${formatarMoedaBR(dLoja.desconto)}</span>
+          <span style="color: #28a745; font-weight: bold;" title="Líquido">L: ${formatarMoedaBR(dLoja.liquido)}</span>
+        </div>
+      `;
+    }).join("");
+
+    return `
+      <div style="margin-bottom: 8px; background: #fafafa; border-radius: 6px; border: 1px solid #e0e0e0; overflow: hidden;">
+        
+        <div onclick="toggleAcordeon('${idUnicoVend}')" style="padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #fdfdfd; user-select: none;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span id="seta_${idUnicoVend}" style="font-size: 12px; font-weight: bold; transition: transform 0.2s; display: inline-block;">▶</span>
+            <span style="font-size: 12px; font-weight: bold; color: #333;">${vendedor.nome}</span>
+          </div>
+          
+          <div style="display: flex; gap: 12px; align-items: center; font-size: 12px;">
+            <span style="color: #555; font-size: 11px;">Qtd: <strong>${vendedor.totalQtd}</strong></span>
+            <span style="color: #0078d7; font-weight: bold;">${formatarMoedaBR(vendedor.totalValorLiquido)}</span>
+          </div>
+        </div>
+
+        <div id="${idUnicoVend}" style="display: none; border-top: 1px solid #eee; background: #fff;">
+          <div style="padding: 2px 6px; background: #f1f3f5; font-size: 10px; font-weight: bold; color: #555; display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; text-align: right;">
+            <span style="text-align: left;">Loja</span>
+            <span>Bruto</span>
+            <span>Desconto</span>
+            <span>Líquido</span>
+          </div>
+          ${linhasLojasVendHTML}
+        </div>
+
+      </div>
+    `;
+  }).join("");
+
+  const cardResumoVendedoresEl = document.getElementById("cardResumoVendedores");
+  if (cardResumoVendedoresEl) {
+    cardResumoVendedoresEl.innerHTML = htmlVendedores || '<div style="padding: 10px; text-align: center; color: #666; font-size: 12px;">Nenhum vendedor encontrado.</div>';
+  }
 
   // --- POPULAR TABELA DA ABA 3 (DETALHES / AUDITORIA) ---
   const tabelaDetalhesCorpo = document.getElementById("tabelaDetalhesCorpo");
@@ -766,54 +859,5 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
         }
       }
     });
-  }
-
-  const containerRankingDescontos = document.getElementById('rankingDescontosContainer');
-  if (containerRankingDescontos) {
-    const listaRankingDesconto = [...listaLojasOrdenadas].sort((a, b) => a.taxaDesconto - b.taxaDesconto);
-
-    let htmlRankingDesc = "";
-    listaRankingDesconto.forEach((item, index) => {
-      let iconePosicao = "";
-      let corBadge = "#666";
-      
-      if (index === 0) { iconePosicao = "🏆 "; corBadge = "#d4af37"; } 
-      else if (index === 1) { iconePosicao = "🥈 "; corBadge = "#aaa"; }
-      else if (index === 2) { iconePosicao = "🥉 "; corBadge = "#cd7f32"; }
-
-      let posicaoNumero = `#${index + 1}`;
-
-      htmlRankingDesc += `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; margin-bottom: 6px; background: #fff; border: 1px solid #e0e0e0; border-radius: 6px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-weight: bold; color: ${index < 3 ? corBadge : '#333'}; font-size: 13px; min-width: 35px;">${posicaoNumero}</span>
-            <div>
-              <strong style="color: ${corBadge};">${iconePosicao}Loja ${item.idLoja}</strong>
-              <div style="font-size: 11px; color: #666;">Desc: ${formatarMoedaBR(item.desconto)} / Bruto: ${formatarMoedaBR(item.bruto)}</div>
-            </div>
-          </div>
-          <div style="text-align: right;">
-            <span style="font-size: 14px; font-weight: bold; color: #28a745;">${item.taxaDesconto.toFixed(2)}%</span>
-            <div style="font-size: 10px; color: #888;">Taxa Média</div>
-          </div>
-        </div>
-      `;
-    });
-
-    containerRankingDescontos.innerHTML = htmlRankingDesc || "Nenhum dado para o ranking.";
-  }
-}
-
-// --- FUNÇÃO PARA O ACORDEON DE PAGAMENTOS ---
-function toggleAcordeon(idUnico) {
-  const elemento = document.getElementById(idUnico);
-  const seta = document.getElementById('seta_' + idUnico);
-  
-  if (elemento.style.display === "none") {
-    elemento.style.display = "block";
-    seta.style.transform = "rotate(90deg)"; // Aponta para baixo
-  } else {
-    elemento.style.display = "none";
-    seta.style.transform = "rotate(0deg)";  // Aponta para o lado
   }
 }
