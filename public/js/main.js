@@ -1,6 +1,6 @@
 /**
  * Módulo Principal de Execução e Regras de Negócio do BI
- * Atualizado com: Zoom de Pagamentos, Lojas -> Vendedores ordenados, e Ranking de Descontos Restaurado do Backup.
+ * Atualizado com: Sanfona de Pagamentos por Loja e Lojas com Vendedores Ordenados por Melhor Venda.
  */
 
 const SUPABASE_URL = 'https://cwmofpwuihrnifsvqhik.supabase.co';
@@ -536,7 +536,7 @@ function processarDadosBI(dados, dadosPagamentos) {
   document.getElementById("biCardsContainer").style.display = "flex";
   mudarAba('cards');
 
-  // --- PROCESSAMENTO DO RESUMO POR LOJAS (VENDEDORES DENTRO, ORDENADOS) ---
+  // --- PROCESSAMENTO DO RESUMO POR LOJAS COM VENDEDORES DENTRO (ORDENADOS DO MELHOR PARA O PIOR) ---
   let agrupadoPorLoja = {};
 
   dadosFiltrados.forEach(item => {
@@ -580,10 +580,13 @@ function processarDadosBI(dados, dadosPagamentos) {
     agrupadoPorLoja[idLoja].totalQtd += 1;
   });
 
+  // Ordena as lojas pelo maior valor líquido geral
   let lojasOrdenadasResumo = Object.values(agrupadoPorLoja).sort((a, b) => b.totalValorLiquido - a.totalValorLiquido);
 
   let htmlLojasResumo = lojasOrdenadasResumo.map(loja => {
     let idUnicoLoja = 'acordeon_loja_' + loja.id;
+    
+    // Ordena os vendedores dentro da loja do melhor para o pior faturamento líquido (b.liquido - a.liquido)
     let vendedoresDaLojaOrdenados = Object.values(loja.vendedores).sort((a, b) => b.liquido - a.liquido);
 
     let linhasVendedoresHTML = vendedoresDaLojaOrdenados.map(v => {
@@ -824,7 +827,7 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
     });
   }
 
-  // --- RESTAURADO DO BACKUP: RANKING DE DESCONTOS PROPORCIONAIS ---
+  // --- RANKING DE DESCONTOS PROPORCIONAIS ---
   const containerRankingDescontos = document.getElementById('rankingDescontosContainer');
   if (containerRankingDescontos) {
     const listaRankingDesconto = [...listaLojasOrdenadas].sort((a, b) => a.taxaDesconto - b.taxaDesconto);
