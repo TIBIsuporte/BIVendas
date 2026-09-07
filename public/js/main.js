@@ -1,6 +1,6 @@
 /**
  * Módulo Principal de Execução e Regras de Negócio do BI
- * Atualizado com: Zoom de Pagamentos, Lojas -> Vendedores ordenados, e Ranking de Descontos Restaurado.
+ * Atualizado com: Zoom de Pagamentos, Lojas -> Vendedores ordenados, e Ranking de Descontos Restaurado do Backup.
  */
 
 const SUPABASE_URL = 'https://cwmofpwuihrnifsvqhik.supabase.co';
@@ -383,13 +383,11 @@ function processarDadosBI(dados, dadosPagamentos) {
   });
 
   let htmlBrutoPorLoja = "";
+  let htmlDescontoPorLoja = "";
   let htmlLiquidoPorLoja = "";
   let htmlQtdeVendasPorLoja = "";
   let htmlTicketMedioPorLoja = "";
   let totalGeralVendasOS = 0;
-
-  // Array estruturado para montar o RANKING DE DESCONTOS ordenado do maior para o menor percentual ou valor
-  let rankingDescontosArray = [];
 
   Object.keys(totaisPorLoja).forEach(id => {
     const t = totaisPorLoja[id];
@@ -397,32 +395,13 @@ function processarDadosBI(dados, dadosPagamentos) {
     totalGeralVendasOS += qtdVendasLoja;
 
     const ticketMedioLoja = qtdVendasLoja > 0 ? (t.liquido / qtdVendasLoja) : 0;
-    const percDescontoLoja = t.bruto > 0 ? (t.desconto / t.bruto) * 100 : 0;
-
-    rankingDescontosArray.push({
-      idLoja: id,
-      desconto: t.desconto,
-      bruto: t.bruto,
-      percentual: percDescontoLoja
-    });
 
     htmlBrutoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 12px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.bruto)}</span></div>`;
+    htmlDescontoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 12px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.desconto)}</span></div>`;
     htmlLiquidoPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 12px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(t.liquido)}</span></div>`;
     htmlQtdeVendasPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 12px;"><span><strong>${id}</strong></span> <span>${qtdVendasLoja}</span></div>`;
     htmlTicketMedioPorLoja += `<div style="display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 12px;"><span><strong>${id}</strong></span> <span>${formatarMoedaBR(ticketMedioLoja)}</span></div>`;
   });
-
-  // Ordena o ranking de descontos do maior percentual de desconto para o menor
-  rankingDescontosArray.sort((a, b) => b.percentual - a.percentual);
-
-  let htmlDescontoPorLoja = rankingDescontosArray.map(item => {
-    return `
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 12px; border-bottom: 1px dashed #eee; padding-bottom: 2px;">
-        <span><strong>Loja ${item.idLoja}</strong> <span style="color: #d9534f; font-size: 10px;">(${item.percentual.toFixed(1)}%)</span></span> 
-        <span style="font-weight: bold; color: #d9534f;">${formatarMoedaBR(item.desconto)}</span>
-      </div>
-    `;
-  }).join("");
 
   const ticketMedioGeral = totalGeralVendasOS > 0 ? (totalLiquidoGeral / totalGeralVendasOS) : 0;
 
@@ -697,7 +676,7 @@ function processarDadosBI(dados, dadosPagamentos) {
   renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrados);
 }
 
-// --- FUNÇÃO PARA RENDERIZAR O DASHBOARD ---
+// --- FUNÇÃO PARA RENDERIZAR O DASHBOARD (COM O RANKING RESTAURADO) ---
 function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrados) {
   
   const listaLojasOrdenadas = Object.keys(totaisPorLoja).map(idLoja => {
@@ -843,5 +822,41 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
         }
       }
     });
+  }
+
+  // --- RESTAURADO DO BACKUP: RANKING DE DESCONTOS PROPORCIONAIS ---
+  const containerRankingDescontos = document.getElementById('rankingDescontosContainer');
+  if (containerRankingDescontos) {
+    const listaRankingDesconto = [...listaLojasOrdenadas].sort((a, b) => a.taxaDesconto - b.taxaDesconto);
+
+    let htmlRankingDesc = "";
+    listaRankingDesconto.forEach((item, index) => {
+      let iconePosicao = "";
+      let corBadge = "#666";
+      
+      if (index === 0) { iconePosicao = "🏆 "; corBadge = "#d4af37"; } 
+      else if (index === 1) { iconePosicao = "🥈 "; corBadge = "#aaa"; }
+      else if (index === 2) { iconePosicao = "🥉 "; corBadge = "#cd7f32"; }
+
+      let posicaoNumero = `#${index + 1}`;
+
+      htmlRankingDesc += `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; margin-bottom: 6px; background: #fff; border: 1px solid #e0e0e0; border-radius: 6px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-weight: bold; color: ${index < 3 ? corBadge : '#333'}; font-size: 13px; min-width: 35px;">${posicaoNumero}</span>
+            <div>
+              <strong style="color: ${corBadge};">${iconePosicao}Loja ${item.idLoja}</strong>
+              <div style="font-size: 11px; color: #666;">Desc: ${formatarMoedaBR(item.desconto)} / Bruto: ${formatarMoedaBR(item.bruto)}</div>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <span style="font-size: 14px; font-weight: bold; color: #28a745;">${item.taxaDesconto.toFixed(2)}%</span>
+            <div style="font-size: 10px; color: #888;">Taxa Média</div>
+          </div>
+        </div>
+      `;
+    });
+
+    containerRankingDescontos.innerHTML = htmlRankingDesc || "Nenhum dado para o ranking.";
   }
 }
