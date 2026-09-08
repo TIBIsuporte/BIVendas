@@ -102,7 +102,6 @@
       <div class="bi-card" style="border-left-color: #6f42c1; padding: 15px; flex: 1; min-width: 350px;">
         <div class="bi-card-title" style="margin-bottom: 10px;">Resumo por Vendedores</div>
         <div class="bi-card-value" id="cardResumoVendedores" style="font-size: 14px; font-weight: normal; line-height: 1.5; text-align: left;">
-          <!-- Estrutura de exemplo em sanfona para os vendedores -->
           <div style="margin-bottom: 8px; background: #fafafa; border-radius: 6px; border: 1px solid #e0e0e0; overflow: hidden;">
             <div onclick="toggleAcordeon('acordeon_vendedor_exemplo')" style="padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #fdfdfd; user-select: none;">
               <div style="display: flex; align-items: center; gap: 8px;">
@@ -151,9 +150,21 @@
 
     </div>
 
-    <!-- Linha 2: Rankings (Ex: Concessão de Desconto) -->
+    <!-- Linha 2: Novo Gráfico (Esquerda) & Ranking de Desconto (Direita) -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px;">
       
+      <!-- Novo Gráfico: Venda Loja / Vendedor -->
+      <div style="background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px;">
+          <h3 id="tituloGraficoLojaVendedor" style="margin: 0; color: #333; font-size: 16px;">Venda Loja / Vendedor</h3>
+          <button type="button" id="btnVoltarGraficoLoja" onclick="voltarParaVisaoLojas()" style="display: none; padding: 3px 8px; background: #6c757d; color: #fff; border: none; border-radius: 4px; font-size: 11px; cursor: pointer;">⬅ Voltar para Lojas</button>
+        </div>
+        <div style="position: relative; width: 100%; height: 260px;">
+          <canvas id="graficoVendaLojaVendedor"></canvas>
+        </div>
+      </div>
+
+      <!-- Ranking de Concessão de Desconto (%) -->
       <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
         <h3 style="margin-top: 0; color: #333; font-size: 16px; border-bottom: 1px solid #eee; padding-bottom: 10px;">Ranking de Concessão de Desconto (%)</h3>
         <p style="font-size: 11px; color: #666; margin-bottom: 10px;">Lojas ordenadas pela maior taxa de desconto proporcional sobre o valor bruto.</p>
@@ -264,6 +275,7 @@
     </div>
   </div>
 </div>
+
   <script src="/js/lojas-modal.js"></script>
   <script src="/js/main.js"></script>
 </body>
