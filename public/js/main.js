@@ -1,6 +1,6 @@
 /**
  * Módulo Principal de Execução e Regras de Negócio do BI
- * Atualizado com: Sanfona, Formas de Pagamento, Vendedores Ordenados, Quantidade de Vendas, Ticket Médio e Novo Gráfico Interativo Loja/Vendedor.
+ * Atualizado com: Sanfona, Formas de Pagamento, Vendedores Ordenados, Quantidade de Vendas, Ticket Médio e Novo Gráfico Interativo Loja/Vendedor com Cores Dinâmicas.
  */
 
 const SUPABASE_URL = 'https://cwmofpwuihrnifsvqhik.supabase.co';
@@ -15,6 +15,11 @@ let dadosPagamentosPorLojaGlobal = {};
 let dadosBrutosGlobaisParaGrafico = []; 
 let meuGraficoZoomPagamento = null;    
 let meuGraficoZoomQuantidade = null;   
+
+const CORES_PALETA = [
+  '#0078d7', '#5cb85c', '#f0ad4e', '#d9534f', '#6f42c1', 
+  '#17a2b8', '#e83e8c', '#fd7e14', '#20c997', '#6610f2'
+];
 
 window.onload = async () => {
   await carregarLojasSupabase();
@@ -200,7 +205,12 @@ function abrirModalZoom(rotuloChave) {
       type: 'bar',
       data: {
         labels: labelsLojas,
-        datasets: [{ label: 'Valor (R$)', data: valoresLojas, backgroundColor: '#0078d7', borderWidth: 1 }]
+        datasets: [{ 
+          label: 'Valor (R$)', 
+          data: valoresLojas, 
+          backgroundColor: CORES_PALETA.slice(0, labelsLojas.length), 
+          borderWidth: 1 
+        }]
       },
       options: {
         responsive: true,
@@ -227,7 +237,12 @@ function abrirModalZoom(rotuloChave) {
       type: 'bar',
       data: {
         labels: labelsLojas,
-        datasets: [{ label: 'Quantidade de Vendas', data: qtdLojas, backgroundColor: '#5cb85c', borderWidth: 1 }]
+        datasets: [{ 
+          label: 'Quantidade de Vendas', 
+          data: qtdLojas, 
+          backgroundColor: CORES_PALETA.slice(0, labelsLojas.length), 
+          borderWidth: 1 
+        }]
       },
       options: {
         responsive: true,
@@ -757,10 +772,6 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
   if (ctx) {
     const labels = listaLojasOrdenadas.map(item => `Loja ${item.idLoja}`);
     const dadosPorcentagem = listaLojasOrdenadas.map(item => item.participacao.toFixed(2));
-    const coresFundo = [
-      '#0078d7', '#5cb85c', '#f0ad4e', '#d9534f', '#6f42c1', 
-      '#17a2b8', '#e83e8c', '#fd7e14', '#20c997', '#6610f2'
-    ];
 
     if (meuGraficoLojas) meuGraficoLojas.destroy();
 
@@ -771,7 +782,7 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
         datasets: [{
           label: '% do Valor Líquido',
           data: dadosPorcentagem,
-          backgroundColor: coresFundo.slice(0, labels.length),
+          backgroundColor: CORES_PALETA.slice(0, labels.length),
           borderWidth: 1
         }]
       },
@@ -827,10 +838,6 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
 
     const labelsPgto = listaPagamentosOrdenada.map(item => item.rotulo);
     const dadosPgtoPorcentagem = listaPagamentosOrdenada.map(item => item.participacao.toFixed(2));
-    const coresPgto = [
-      '#0078d7', '#5cb85c', '#f0ad4e', '#d9534f', '#6f42c1', 
-      '#17a2b8', '#e83e8c', '#fd7e14', '#20c997', '#6610f2'
-    ];
 
     if (meuGraficoPagamentos) meuGraficoPagamentos.destroy();
 
@@ -841,7 +848,7 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
         datasets: [{
           label: '% por Pagamento',
           data: dadosPgtoPorcentagem,
-          backgroundColor: coresPgto.slice(0, labelsPgto.length),
+          backgroundColor: CORES_PALETA.slice(0, labelsPgto.length),
           borderWidth: 1
         }]
       },
@@ -935,7 +942,7 @@ function renderizarGraficoVendaLojasGeral() {
   const lojasOrdenadas = Object.keys(totaisLojas).map(id => ({ id, valor: totaisLojas[id] }));
   lojasOrdenadas.sort((a, b) => b.valor - a.valor);
 
-  const labels = lojasIdsMap = lojasOrdenadas.map(l => `Loja ${l.id}`);
+  const labels = lojasOrdenadas.map(l => `Loja ${l.id}`);
   const valores = lojasOrdenadas.map(l => l.valor);
   const idsOriginais = lojasOrdenadas.map(l => l.id);
 
@@ -948,7 +955,7 @@ function renderizarGraficoVendaLojasGeral() {
       datasets: [{
         label: 'Valor Líquido (R$)',
         data: valores,
-        backgroundColor: '#0078d7',
+        backgroundColor: CORES_PALETA.slice(0, labels.length),
         borderWidth: 1
       }]
     },
@@ -1018,7 +1025,7 @@ function renderizarGraficoVendedoresDaLoja(idLoja) {
       datasets: [{
         label: 'Valor Líquido (R$)',
         data: valores,
-        backgroundColor: '#5cb85c',
+        backgroundColor: CORES_PALETA.slice(0, labels.length),
         borderWidth: 1
       }]
     },
