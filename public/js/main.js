@@ -1,6 +1,6 @@
 /**
  * Módulo Principal de Execução e Regras de Negócio do BI
- * Atualizado com: Sanfona, Formas de Pagamento, Vendedores Ordenados, Quantidade de Vendas e Ticket Médio por Vendedor.
+ * Atualizado com: Sanfona, Formas de Pagamento, Vendedores Ordenados, Quantidade de Vendas, Ticket Médio e Novo Gráfico Interativo Loja/Vendedor.
  */
 
 const SUPABASE_URL = 'https://cwmofpwuihrnifsvqhik.supabase.co';
@@ -10,7 +10,9 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let lojasDisponiveis = [];
 let meuGraficoLojas = null;             
 let meuGraficoPagamentos = null;  
+let meuGraficoLojaVendedor = null;      
 let dadosPagamentosPorLojaGlobal = {}; 
+let dadosBrutosGlobaisParaGrafico = []; 
 let meuGraficoZoomPagamento = null;    
 let meuGraficoZoomQuantidade = null;   
 
@@ -346,6 +348,8 @@ function processarDadosBI(dados, dadosPagamentos) {
     });
   }
 
+  dadosBrutosGlobaisParaGrafico = dadosFiltrados;
+
   let totalBrutoGeral = 0;
   let totalDescontoGeral = 0;
   let totalLiquidoGeral = 0;
@@ -513,7 +517,6 @@ function processarDadosBI(dados, dadosPagamentos) {
             <div style="display: flex; gap: 12px; align-items: center; font-size: 12px;">
               <span style="color: #555; font-size: 11px;">Qtd: <strong>${totalGeralQtdGrupo}</strong></span>
               <span style="color: #0078d7; font-weight: bold;">${formatarMoedaBR(totalGeralValorGrupo)}</span>
-              <!-- BOTÃO DE ZOOM -->
               <button type="button" onclick="event.stopPropagation(); abrirModalZoom('${chaveReal}')" style="background: #0078d7; color: #fff; border: none; padding: 3px 6px; border-radius: 4px; font-size: 10px; cursor: pointer;" title="Ver Detalhes por Loja">🔍</button>
             </div>
           </div>
@@ -790,6 +793,9 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
     });
   }
 
+  // --- RENDERIZAR GRÁFICO: Venda Loja / Vendedor (Interativo / Drill-down) ---
+  renderizarGraficoVendaLojasGeral();
+
   const containerPagamentosGrafico = document.getElementById('graficoParticipacaoPagamentos');
   if (containerPagamentosGrafico && Array.isArray(pagamentosFiltrados) && pagamentosFiltrados.length > 0) {
     
@@ -903,4 +909,140 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
 
     containerRankingDescontos.innerHTML = htmlRankingDesc || "Nenhum dado para o ranking.";
   }
+}
+
+// --- FUNÇÕES DO GRÁFICO INTERATIVO: VENDA LOJA / VENDEDOR ---
+function renderizarGraficoVendaLojasGeral() {
+  const ctx = document.getElementById('graficoVendaLojaVendedor');
+  const tituloEl = document.getElementById('tituloGraficoLojaVendedor');
+  const btnVoltar = document.getElementById('btnVoltarGraficoLoja');
+  
+  if (!ctx) return;
+
+  if (tituloEl) tituloEl.innerText = "Venda por Loja (Líquido)";
+  if (btnVoltar) btnVoltar.style.display = "none";
+
+  const totaisLojas = {};
+  dadosBrutosGlobaisParaGrafico.forEach(item => {
+    let textoLoja = String(item.LOJANOME ?? item.CODIGOLOJA ?? item.LOJA ?? "Geral").trim();
+    let matchLoja = textoLoja.match(/^0*(\d+)/);
+    let idLoja = matchLoja ? matchLoja[1] : textoLoja;
+    let liquido = parseNumeroBR(item.LIQUIDOPRODUTO);
+
+    totaisLojas[idLoja] = (totaisLojas[idLoja] || 0) + liquido;
+  });
+
+  const lojasOrdenadas = Object.keys(totaisLojas).map(id => ({ id, valor: totaisLojas[id] }));
+  lojasOrdenadas.sort((a, b) => b.valor - a.valor);
+
+  const labels = lojasIdsMap = lojasOrdenadas.map(l => `Loja ${l.id}`);
+  const valores = lojasOrdenadas.map(l => l.valor);
+  const idsOriginais = lojasOrdenadas.map(l => l.id);
+
+  if (meuGraficoLojaVendedor) meuGraficoLojaVendedor.destroy();
+
+  meuGraficoLojaVendedor = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Valor Líquido (R$)',
+        data: valores,
+        backgroundColor: '#0078d7',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(context) { return ` Líquido: ${formatarMoedaBR(context.raw)}`; }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: { callback: function(value) { return 'R$ ' + value.toLocaleString('pt-BR'); } }
+        }
+      },
+      onClick: (event, elements) => {
+        if (elements && elements.length > 0) {
+          const index = elements[0].index;
+          const idLojaSelecionada = idsOriginais[index];
+          renderizarGraficoVendedoresDaLoja(idLojaSelecionada);
+        }
+      }
+    }
+  });
+}
+
+function renderizarGraficoVendedoresDaLoja(idLoja) {
+  const ctx = document.getElementById('graficoVendaLojaVendedor');
+  const tituloEl = document.getElementById('tituloGraficoLojaVendedor');
+  const btnVoltar = document.getElementById('btnVoltarGraficoLoja');
+  
+  if (!ctx) return;
+
+  if (tituloEl) tituloEl.innerText = `Vendedores da Loja ${idLoja} (Líquido)`;
+  if (btnVoltar) btnVoltar.style.display = "inline-block";
+
+  const vendasVendedores = {};
+  dadosBrutosGlobaisParaGrafico.forEach(item => {
+    let textoLoja = String(item.LOJANOME ?? item.CODIGOLOJA ?? item.LOJA ?? "").trim();
+    let matchLoja = textoLoja.match(/^0*(\d+)/);
+    let idLojaItem = matchLoja ? matchLoja[1] : textoLoja;
+
+    if (idLojaItem === String(idLoja)) {
+      let vendedor = item.VENDEDOR ? item.VENDEDOR.trim() : "NÃO INFORMADO";
+      let liquido = parseNumeroBR(item.LIQUIDOPRODUTO);
+      vendasVendedores[vendedor] = (vendasVendedores[vendedor] || 0) + liquido;
+    }
+  });
+
+  const vendedoresOrdenados = Object.keys(vendasVendedores).map(v => ({ nome: v, valor: vendasVendedores[v] }));
+  vendedoresOrdenados.sort((a, b) => b.valor - a.valor);
+
+  const labels = vendedoresOrdenados.map(v => v.nome);
+  const valores = vendedoresOrdenados.map(v => v.valor);
+
+  if (meuGraficoLojaVendedor) meuGraficoLojaVendedor.destroy();
+
+  meuGraficoLojaVendedor = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Valor Líquido (R$)',
+        data: valores,
+        backgroundColor: '#5cb85c',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(context) { return ` Líquido: ${formatarMoedaBR(context.raw)}`; }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: { callback: function(value) { return 'R$ ' + value.toLocaleString('pt-BR'); } }
+        }
+      }
+    }
+  });
+}
+
+function voltarParaVisaoLojas() {
+  renderizarGraficoVendaLojasGeral();
 }
