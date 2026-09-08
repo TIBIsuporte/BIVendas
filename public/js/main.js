@@ -1,6 +1,6 @@
 /**
  * Módulo Principal de Execução e Regras de Negócio do BI
- * Atualizado com: Sanfona Corrigida, Formas de Pagamento por Loja e Lojas com Vendedores Ordenados por Melhor Venda.
+ * Atualizado com: Sanfona, Formas de Pagamento, Vendedores Ordenados, Quantidade de Vendas e Ticket Médio por Vendedor.
  */
 
 const SUPABASE_URL = 'https://cwmofpwuihrnifsvqhik.supabase.co';
@@ -533,7 +533,7 @@ function processarDadosBI(dados, dadosPagamentos) {
   
   // Atualiza os cards no HTML
   document.getElementById("cardValorBruto").innerHTML = `${htmlBrutoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 15px; font-weight: bold;">${formatarMoedaBR(totalBrutoGeral)}</div>`;
-  document.getElementById("cardDesconto").innerHTML = `${htmlDescontoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 15px; font-weight: bold; color: #d9534f;">${formatarMoedaBR(totalDescontoGeral)}</div>`;
+  document.getElementById("cardDesconto").innerHTML = `${htmlDescontoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 15px; font-weight: bold; color: #d9534f;;">${formatarMoedaBR(totalDescontoGeral)}</div>`;
   document.getElementById("cardValorLiquido").innerHTML = `${htmlLiquidoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 15px; font-weight: bold;">${formatarMoedaBR(totalLiquidoGeral)}</div>`;
   
   const cardQtdeVendasEl = document.getElementById("cardQtdeVendas");
@@ -552,7 +552,7 @@ function processarDadosBI(dados, dadosPagamentos) {
   document.getElementById("biCardsContainer").style.display = "flex";
   mudarAba('cards');
 
-  // --- PROCESSAMENTO DO RESUMO POR LOJAS COM VENDEDORES DENTRO ---
+  // --- PROCESSAMENTO DO RESUMO POR LOJAS E VENDEDORES (COM QTD DE VENDAS E TICKET MÉDIO) ---
   let agrupadoPorLoja = {};
 
   dadosFiltrados.forEach(item => {
@@ -562,6 +562,7 @@ function processarDadosBI(dados, dadosPagamentos) {
     let nomeLojaCompleta = item.LOJANOME || `Loja ${idLoja}`;
 
     let nomeVendedor = item.VENDEDOR ? item.VENDEDOR.trim() : "NÃO INFORMADO";
+    let numeroOS = String(item.OS || "").trim();
 
     if (!agrupadoPorLoja[idLoja]) {
       agrupadoPorLoja[idLoja] = {
@@ -569,7 +570,8 @@ function processarDadosBI(dados, dadosPagamentos) {
         nome: nomeLojaCompleta,
         totalValorLiquido: 0,
         totalQtd: 0,
-        vendedores: {}
+        vendedores: {},
+        osUnicasLoja: new Set()
       };
     }
 
@@ -579,7 +581,7 @@ function processarDadosBI(dados, dadosPagamentos) {
         bruto: 0,
         desconto: 0,
         liquido: 0,
-        quantidade: 0
+        osPorVendedor: {}
       };
     }
 
@@ -590,10 +592,19 @@ function processarDadosBI(dados, dadosPagamentos) {
     agrupadoPorLoja[idLoja].vendedores[nomeVendedor].bruto += bruto;
     agrupadoPorLoja[idLoja].vendedores[nomeVendedor].desconto += desconto;
     agrupadoPorLoja[idLoja].vendedores[nomeVendedor].liquido += liquido;
-    agrupadoPorLoja[idLoja].vendedores[nomeVendedor].quantidade += 1;
+
+    if (numeroOS) {
+      // Registra OS para o vendedor
+      if (!agrupadoPorLoja[idLoja].vendedores[nomeVendedor].osPorVendedor[numeroOS]) {
+        agrupadoPorLoja[idLoja].vendedores[nomeVendedor].osPorVendedor[numeroOS] = 0;
+      }
+      agrupadoPorLoja[idLoja].vendedores[nomeVendedor].osPorVendedor[numeroOS] += bruto;
+
+      // Registra OS para a loja
+      agrupadoPorLoja[idLoja].osUnicasLoja.add(numeroOS);
+    }
 
     agrupadoPorLoja[idLoja].totalValorLiquido += liquido;
-    agrupadoPorLoja[idLoja].totalQtd += 1;
   });
 
   // Ordena as lojas pelo maior valor líquido geral
@@ -602,16 +613,34 @@ function processarDadosBI(dados, dadosPagamentos) {
   let htmlLojasResumo = lojasOrdenadasResumo.map(loja => {
     let idUnicoLoja = 'acordeon_loja_' + loja.id;
     
-    // Ordena os vendedores dentro da loja do melhor para o pior faturamento líquido
-    let vendedoresDaLojaOrdenados = Object.values(loja.vendedores).sort((a, b) => b.liquido - a.liquido);
+    // Calcula quantidade de OS válidas por vendedor e o seu Ticket Médio
+    let vendedoresProcessados = Object.values(loja.vendedores).map(v => {
+      let qtdVendasVendedor = 0;
+      Object.keys(v.osPorVendedor).forEach(osNum => {
+        if (v.osPorVendedor[osNum] > 0) qtdVendasVendedor++;
+      });
+      let ticketMedioVendedor = qtdVendasVendedor > 0 ? (v.liquido / qtdVendasVendedor) : 0;
+      
+      return {
+        ...v,
+        qtdVendas: qtdVendasVendedor,
+        ticketMedio: ticketMedioVendedor
+      };
+    });
 
-    let linhasVendedoresHTML = vendedoresDaLojaOrdenados.map(v => {
+    // Ordena os vendedores dentro da loja do melhor para o pior faturamento líquido
+    vendedoresProcessados.sort((a, b) => b.liquido - a.liquido);
+
+    let totalQtdVendasLoja = loja.osUnicasLoja.size;
+
+    let linhasVendedoresHTML = vendedoresProcessados.map(v => {
       return `
-        <div style="padding: 6px 10px; border-bottom: 1px dashed #eee; font-size: 11px; background: #fff; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; align-items: center; text-align: right;">
+        <div style="padding: 6px 10px; border-bottom: 1px dashed #eee; font-size: 11px; background: #fff; display: grid; grid-template-columns: 2fr 0.8fr 1fr 1fr 1fr; align-items: center; text-align: right;">
           <span style="font-weight: bold; color: #555; text-align: left;">👤 ${v.nome}</span>
-          <span style="color: #666;" title="Bruto">B: ${formatarMoedaBR(v.bruto)}</span>
-          <span style="color: #d9534f;" title="Desconto">D: ${formatarMoedaBR(v.desconto)}</span>
-          <span style="color: #28a745; font-weight: bold;" title="Líquido">L: ${formatarMoedaBR(v.liquido)}</span>
+          <span style="color: #444; text-align: center;" title="Quantidade de Vendas">Qtd: <strong>${v.qtdVendas}</strong></span>
+          <span style="color: #666;" title="Líquido">Lq: ${formatarMoedaBR(v.liquido)}</span>
+          <span style="color: #d9534f;" title="Desconto">Desc: ${formatarMoedaBR(v.desconto)}</span>
+          <span style="color: #0078d7; font-weight: bold;" title="Ticket Médio">TM: ${formatarMoedaBR(v.ticketMedio)}</span>
         </div>
       `;
     }).join("");
@@ -626,17 +655,18 @@ function processarDadosBI(dados, dadosPagamentos) {
           </div>
           
           <div style="display: flex; gap: 12px; align-items: center; font-size: 12px;">
-            <span style="color: #555; font-size: 11px;">Qtd: <strong>${loja.totalQtd}</strong></span>
+            <span style="color: #555; font-size: 11px;">Qtd: <strong>${totalQtdVendasLoja}</strong></span>
             <span style="color: #0078d7; font-weight: bold;">${formatarMoedaBR(loja.totalValorLiquido)}</span>
           </div>
         </div>
 
         <div id="${idUnicoLoja}" style="display: none; border-top: 1px solid #eee; background: #fff;">
-          <div style="padding: 2px 6px; background: #f1f3f5; font-size: 10px; font-weight: bold; color: #555; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; text-align: right;">
+          <div style="padding: 4px 6px; background: #f1f3f5; font-size: 10px; font-weight: bold; color: #555; display: grid; grid-template-columns: 2fr 0.8fr 1fr 1fr 1fr; text-align: right;">
             <span style="text-align: left;">Vendedor</span>
-            <span>Bruto</span>
-            <span>Desconto</span>
+            <span style="text-align: center;">Qtd Vendas</span>
             <span>Líquido</span>
+            <span>Desconto</span>
+            <span>Ticket Médio</span>
           </div>
           ${linhasVendedoresHTML}
         </div>
@@ -865,7 +895,7 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
             <span style="font-weight: bold; color: ${index < 3 ? corBadge : '#333'}; font-size: 13px; min-width: 35px;">${posicaoNumero}</span>
             <div>
               <strong style="color: ${corBadge};">${iconePosicao}Loja ${item.idLoja}</strong>
-              <div style="font-size: 11px; color: #666;">Desc: ${formatarMoedaBR(item.desconto)} / Bruto: ${formatarMoedaBR(item.bruto)}</div>
+              <div style="font-size: 11px; color: #666;">Desc: ${formatarMoedaBR(item.desconto)} / Bruto: ${formatarMo2BR(item.bruto)}</div>
             </div>
           </div>
           <div style="text-align: right;">
