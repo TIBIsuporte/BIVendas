@@ -594,26 +594,22 @@ function processarDadosBI(dados, dadosPagamentos) {
     agrupadoPorLoja[idLoja].vendedores[nomeVendedor].liquido += liquido;
 
     if (numeroOS) {
-      // Registra OS para o vendedor
       if (!agrupadoPorLoja[idLoja].vendedores[nomeVendedor].osPorVendedor[numeroOS]) {
         agrupadoPorLoja[idLoja].vendedores[nomeVendedor].osPorVendedor[numeroOS] = 0;
       }
       agrupadoPorLoja[idLoja].vendedores[nomeVendedor].osPorVendedor[numeroOS] += bruto;
 
-      // Registra OS para a loja
       agrupadoPorLoja[idLoja].osUnicasLoja.add(numeroOS);
     }
 
     agrupadoPorLoja[idLoja].totalValorLiquido += liquido;
   });
 
-  // Ordena as lojas pelo maior valor líquido geral
   let lojasOrdenadasResumo = Object.values(agrupadoPorLoja).sort((a, b) => b.totalValorLiquido - a.totalValorLiquido);
 
   let htmlLojasResumo = lojasOrdenadasResumo.map(loja => {
     let idUnicoLoja = 'acordeon_loja_' + loja.id;
     
-    // Calcula quantidade de OS válidas por vendedor e o seu Ticket Médio
     let vendedoresProcessados = Object.values(loja.vendedores).map(v => {
       let qtdVendasVendedor = 0;
       Object.keys(v.osPorVendedor).forEach(osNum => {
@@ -628,7 +624,6 @@ function processarDadosBI(dados, dadosPagamentos) {
       };
     });
 
-    // Ordena os vendedores dentro da loja do melhor para o pior faturamento líquido
     vendedoresProcessados.sort((a, b) => b.liquido - a.liquido);
 
     let totalQtdVendasLoja = loja.osUnicasLoja.size;
@@ -895,7 +890,7 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
             <span style="font-weight: bold; color: ${index < 3 ? corBadge : '#333'}; font-size: 13px; min-width: 35px;">${posicaoNumero}</span>
             <div>
               <strong style="color: ${corBadge};">${iconePosicao}Loja ${item.idLoja}</strong>
-              <div style="font-size: 11px; color: #666;">Desc: ${formatarMoedaBR(item.desconto)} / Bruto: ${formatarMo2BR(item.bruto)}</div>
+              <div style="font-size: 11px; color: #666;">Desc: ${formatarMoedaBR(item.desconto)} / Bruto: ${formatarMoedaBR(item.bruto)}</div>
             </div>
           </div>
           <div style="text-align: right;">
