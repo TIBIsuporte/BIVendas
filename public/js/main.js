@@ -688,8 +688,8 @@ function processarDadosBI(dados, dadosPagamentos) {
   
   document.getElementById("biTabsHeader").style.display = "flex";
   document.getElementById("biCardsContainer").style.display = "flex";
-  mudarAba('cards');
-
+  mudarAba('dashboard'); // <--- Alterado de 'cards' para 'dashboard'
+  
   // --- PROCESSAMENTO DO RESUMO POR LOJAS E VENDEDORES ---
   let agrupadoPorLoja = {};
 
