@@ -1,6 +1,6 @@
 /**
  * Módulo Principal de Execução e Regras de Negócio do BI
- * Atualizado com: Gráficos de Rosca em cima e em baixo, e clique na fatia da loja abrindo o modal estilo Imagem 2.
+ * Atualizado: Removido clique do gráfico superior e adicionado valor total no título do gráfico inferior.
  */
 
 const SUPABASE_URL = 'https://cwmofpwuihrnifsvqhik.supabase.co';
@@ -156,7 +156,7 @@ function confirmarSelecaoLojas() {
 }
 // ---------------------------------
 
-// --- FUNÇÕES DO MODAL DE ZOOM (ESTILO IMAGEM 2) ---
+// --- FUNÇÕES DO MODAL DE ZOOM ---
 function abrirModalZoom(rotuloChave) {
   const dadosDoGrupo = dadosPagamentosPorLojaGlobal[rotuloChave];
   if (!dadosDoGrupo) return;
@@ -261,7 +261,7 @@ function abrirModalZoom(rotuloChave) {
   }
 }
 
-// NOVO: Função para abrir modal detalhado de uma loja específica clicada no gráfico de rosca de lojas
+// Função para abrir modal detalhado de uma loja específica clicada no gráfico de VENDEDORES (inferior)
 function abrirModalZoomLojaUnica(idLoja) {
   const dadosLojaObj = dadosBrutosGlobaisParaGrafico.filter(item => {
     let textoLoja = String(item.LOJANOME ?? item.CODIGOLOJA ?? item.LOJA ?? "").trim();
@@ -277,7 +277,6 @@ function abrirModalZoomLojaUnica(idLoja) {
     tituloEl.innerText = `Detalhes dos Vendedores — Loja ${idLoja}`;
   }
 
-  // Agrupar por vendedor para exibir nas barras
   const vendasVendedores = {};
   let totalLiquidoLoja = 0;
   let osUnicasLoja = new Set();
@@ -671,7 +670,6 @@ function processarDadosBI(dados, dadosPagamentos) {
     htmlPagamentos = "Nenhum registro de pagamento para a(s) loja(s) selecionada(s).";
   }
   
-  // Atualiza os cards no HTML
   document.getElementById("cardValorBruto").innerHTML = `${htmlBrutoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 15px; font-weight: bold;">${formatarMoedaBR(totalBrutoGeral)}</div>`;
   document.getElementById("cardDesconto").innerHTML = `${htmlDescontoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 15px; font-weight: bold; color: #d9534f;;">${formatarMoedaBR(totalDescontoGeral)}</div>`;
   document.getElementById("cardValorLiquido").innerHTML = `${htmlLiquidoPorLoja}<hr style="border:0; border-top:1px solid #ddd; margin: 8px 0;"><div style="font-size: 15px; font-weight: bold;">${formatarMoedaBR(totalLiquidoGeral)}</div>`;
@@ -894,10 +892,10 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
   if (ctx) {
     const labels = listaLojasOrdenadas.map(item => `Loja ${item.idLoja}`);
     const dadosPorcentagem = listaLojasOrdenadas.map(item => item.participacao.toFixed(2));
-    const idsOriginaisLojas = listaLojasOrdenadas.map(item => item.idLoja);
 
     if (meuGraficoLojas) meuGraficoLojas.destroy();
 
+    // AJUSTE 1: Removido completamente o evento 'onClick' deste gráfico superior esquerdo
     meuGraficoLojas = new Chart(ctx, {
       type: 'doughnut',
       data: {
@@ -922,20 +920,13 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
               }
             }
           }
-        },
-        onClick: (event, elements) => {
-          if (elements && elements.length > 0) {
-            const index = elements[0].index;
-            const idLojaSelecionada = idsOriginaisLojas[index];
-            abrirModalZoomLojaUnica(idLojaSelecionada);
-          }
         }
       }
     });
   }
 
-  // --- RENDERIZAR GRÁFICO INFERIOR: Agora também ROSCA (Doughnut) ---
-  renderizarGraficoVendaLojasGeral();
+  // --- RENDERIZAR GRÁFICO INFERIOR (PASSANDO O VALOR TOTAL LÍQUIDO) ---
+  renderizarGraficoVendaLojasGeral(totalLiquidoGeral);
 
   const containerPagamentosGrafico = document.getElementById('graficoParticipacaoPagamentos');
   if (containerPagamentosGrafico && Array.isArray(pagamentosFiltrados) && pagamentosFiltrados.length > 0) {
@@ -1048,15 +1039,19 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
   }
 }
 
-// --- FUNÇÃO DO GRÁFICO INFERIOR ALTERADO PARA ROSCA (Doughnut) ---
-function renderizarGraficoVendaLojasGeral() {
+// --- FUNÇÃO DO GRÁFICO INFERIOR (COM O VALOR TOTAL NO TÍTULO) ---
+function renderizarGraficoVendaLojasGeral(totalLiquidoGeral = 0) {
   const ctx = document.getElementById('graficoVendaLojaVendedor');
   const tituloEl = document.getElementById('tituloGraficoLojaVendedor');
   const btnVoltar = document.getElementById('btnVoltarGraficoLoja');
   
   if (!ctx) return;
 
-  if (tituloEl) tituloEl.innerText = "Vendas Loja por Vendedor (Valor Líquido)";
+  // AJUSTE 2: Adicionando o valor total de vendas formatado no título do gráfico inferior
+  if (tituloEl) {
+    tituloEl.innerHTML = `Vendas Loja por Vendedor (Valor Líquido) — <span style="color: #0078d7; font-weight: bold;">${formatarMoedaBR(totalLiquidoGeral)}</span>`;
+  }
+  
   if (btnVoltar) btnVoltar.style.display = "none";
 
   const totaisLojas = {};
