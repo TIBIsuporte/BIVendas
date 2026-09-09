@@ -1,6 +1,6 @@
 /**
  * Módulo Principal de Execução e Regras de Negócio do BI
- * Atualizado: Removido clique do gráfico superior e adicionado valor total no título do gráfico inferior.
+ * Atualizado: Adicionado Ticket Médio ordenado do maior para o menor no card de resumo do modal de zoom.
  */
 
 const SUPABASE_URL = 'https://cwmofpwuihrnifsvqhik.supabase.co';
@@ -301,21 +301,41 @@ function abrirModalZoomLojaUnica(idLoja) {
     totalLiquidoLoja += vendasVendedores[v].valor;
   });
 
+  // Calculando o Ticket Médio Geral da Loja
+  const totalQtdLoja = osUnicasLoja.size;
+  const ticketMedioGeralLoja = totalQtdLoja > 0 ? (totalLiquidoLoja / totalQtdLoja) : 0;
+
+  // Criando a lista de vendedores com seus respectivos tickets médios para ordená-los do maior para o menor
+  let listaVendedoresArray = Object.keys(vendasVendedores).map(vendedor => {
+    const dadosV = vendasVendedores[vendedor];
+    const tmVendedor = dadosV.qtd > 0 ? (dadosV.valor / dadosV.qtd) : 0;
+    return {
+      nome: vendedor,
+      valor: dadosV.valor,
+      qtd: dadosV.qtd,
+      ticketMedio: tmVendedor
+    };
+  });
+
+  // Ordenando do maior Ticket Médio para o menor
+  listaVendedoresArray.sort((a, b) => b.ticketMedio - a.ticketMedio);
+
   const destaqueEl = document.getElementById("destaqueCampeaoModal");
   if (destaqueEl) {
     destaqueEl.innerHTML = `
       🏪 <strong>Resumo da Loja ${idLoja}:</strong><br>
       • Faturamento Líquido Total: <strong style="color: #0056b3;">${formatarMoedaBR(totalLiquidoLoja)}</strong><br>
-      • Total de Vendas (OS): <strong style="color: #0056b3;">${osUnicasLoja.size}</strong>
+      • Total de Vendas (OS): <strong style="color: #0056b3;">${totalQtdLoja}</strong><br>
+      • Ticket Médio da Loja: <strong style="color: #28a745;">${formatarMoedaBR(ticketMedioGeralLoja)}</strong>
     `;
   }
 
   const modal = document.getElementById("modalZoomPagamento");
   if (modal) modal.style.display = "flex";
 
-  const labelsVendedores = Object.keys(vendasVendedores);
-  const valoresVendedores = labelsVendedores.map(v => vendasVendedores[v].valor);
-  const qtdVendedores = labelsVendedores.map(v => vendasVendedores[v].qtd);
+  const labelsVendedores = listaVendedoresArray.map(v => v.nome);
+  const valoresVendedores = listaVendedoresArray.map(v => v.valor);
+  const qtdVendedores = listaVendedoresArray.map(v => v.qtd);
 
   if (meuGraficoZoomPagamento) meuGraficoZoomPagamento.destroy();
   if (meuGraficoZoomQuantidade) meuGraficoZoomQuantidade.destroy();
@@ -688,7 +708,7 @@ function processarDadosBI(dados, dadosPagamentos) {
   
   document.getElementById("biTabsHeader").style.display = "flex";
   document.getElementById("biCardsContainer").style.display = "flex";
-  mudarAba('dashboard'); // <--- Alterado de 'cards' para 'dashboard'
+  mudarAba('dashboard');
   
   // --- PROCESSAMENTO DO RESUMO POR LOJAS E VENDEDORES ---
   let agrupadoPorLoja = {};
@@ -762,7 +782,8 @@ function processarDadosBI(dados, dadosPagamentos) {
       };
     });
 
-    vendedoresProcessados.sort((a, b) => b.liquido - a.liquido);
+    // Ordenando os vendedores pelo Ticket Médio do maior para o menor
+    vendedoresProcessados.sort((a, b) => b.ticketMedio - a.ticketMedio);
 
     let totalQtdVendasLoja = loja.osUnicasLoja.size;
 
@@ -895,7 +916,6 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
 
     if (meuGraficoLojas) meuGraficoLojas.destroy();
 
-    // AJUSTE 1: Removido completamente o evento 'onClick' deste gráfico superior esquerdo
     meuGraficoLojas = new Chart(ctx, {
       type: 'doughnut',
       data: {
@@ -925,7 +945,6 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
     });
   }
 
-  // --- RENDERIZAR GRÁFICO INFERIOR (PASSANDO O VALOR TOTAL LÍQUIDO) ---
   renderizarGraficoVendaLojasGeral(totalLiquidoGeral);
 
   const containerPagamentosGrafico = document.getElementById('graficoParticipacaoPagamentos');
@@ -1002,7 +1021,6 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
     });
   }
 
-  // --- RANKING DE DESCONTOS PROPORCIONAIS ---
   const containerRankingDescontos = document.getElementById('rankingDescontosContainer');
   if (containerRankingDescontos) {
     const listaRankingDesconto = [...listaLojasOrdenadas].sort((a, b) => a.taxaDesconto - b.taxaDesconto);
@@ -1039,7 +1057,6 @@ function renderizarDashboard(totaisPorLoja, totalLiquidoGeral, pagamentosFiltrad
   }
 }
 
-// --- FUNÇÃO DO GRÁFICO INFERIOR (COM O VALOR TOTAL NO TÍTULO) ---
 function renderizarGraficoVendaLojasGeral(totalLiquidoGeral = 0) {
   const ctx = document.getElementById('graficoVendaLojaVendedor');
   const tituloEl = document.getElementById('tituloGraficoLojaVendedor');
@@ -1047,7 +1064,6 @@ function renderizarGraficoVendaLojasGeral(totalLiquidoGeral = 0) {
   
   if (!ctx) return;
 
-  // AJUSTE 2: Adicionando o valor total de vendas formatado no título do gráfico inferior
   if (tituloEl) {
     tituloEl.innerHTML = `Vendas Loja por Vendedor (Valor Líquido) — <span style="color: #0078d7; font-weight: bold;">${formatarMoedaBR(totalLiquidoGeral)}</span>`;
   }
