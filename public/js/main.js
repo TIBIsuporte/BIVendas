@@ -1056,7 +1056,7 @@ function renderizarGraficoVendaLojasGeral() {
   
   if (!ctx) return;
 
-  if (tituloEl) tituloEl.innerText = "Participação por Loja (Valor Líquido)";
+  if (tituloEl) tituloEl.innerText = "Vendas Loja por Vendodor (Valor Líquido)";
   if (btnVoltar) btnVoltar.style.display = "none";
 
   const totaisLojas = {};
